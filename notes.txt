@@ -1,0 +1,6 @@
+Websocket options:
+- Gorilla/websocket
+Web:
+- Fiber
+Message Broker:
+- Redis

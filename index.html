@@ -8,6 +8,8 @@
 <body>
 <h2>WebSocket Test</h2>
 <div>
+    <H1 id="sender"></H1>
+    <br/>
     <label for="receiver_id">Receiver Id</label>
     <input id="receiver_id" type="number" placeholder="Enter receiver id">
 
@@ -18,7 +20,11 @@
 </div>
 <ul id="messages"></ul>
 <script>
-    const ws = new WebSocket('ws://localhost:8000/ws/' + Math.floor(Math.random() * 100000));
+
+    let sender = Math.floor(Math.random() * 100000).toString();
+    document.getElementById('sender').innerHTML = sender;
+
+    const ws = new WebSocket('ws://localhost:8000/ws/' + sender);
 
     ws.onmessage = function (event) {
         const messages = document.getElementById('messages');

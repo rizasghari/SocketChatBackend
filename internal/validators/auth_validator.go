@@ -1,34 +1,45 @@
 package validators
 
 import (
-	"errors"
 	"log"
 	"regexp"
+	"socketChat/internal/errs"
 	"socketChat/internal/models"
 )
 
-func ValidateUser(user *models.User) error {
+func ValidateUser(user *models.User) []error {
+	var errors []error
 	if user == nil {
-		return errors.New("user is nil")
+		errors = append(errors, errs.ErrInvalidUser)
+		return errors
 	}
 
-	if user.FirstName == "" || len(user.FirstName) < 2 {
-		return errors.New("first name is empty or too short")
-	}
-
-	if user.LastName == "" || len(user.LastName) < 2 {
-		return errors.New("last name is empty or too short")
-	}
-
-	if user.Email == "" {
-		return errors.New("email is empty")
+	if user.Email == "" || !ValidateEmail(user.Email) {
+		errors = append(errors, errs.ErrInvalidEmail)
 	}
 
 	if !ValidatePassword(user.Password) {
-		return errors.New("password is invalid")
+		errors = append(errors, errs.ErrInvalidPassword)
 	}
 
-	return nil
+	if user.FirstName == "" || len(user.FirstName) < 2 {
+		errors = append(errors, errs.ErrFirstName)
+	}
+
+	if user.LastName == "" || len(user.LastName) < 2 {
+		errors = append(errors, errs.ErrLastName)
+	}
+	return errors
+}
+
+func ValidateEmail(email string) bool {
+	pattern := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
+	regex, err := regexp.Compile(pattern)
+	if err != nil {
+		log.Println("Error compiling regular expression:", err)
+		return false
+	}
+	return regex.MatchString(email)
 }
 
 func ValidatePassword(password string) bool {
@@ -44,7 +55,6 @@ func ValidatePassword(password string) bool {
 	// Compile the regular expression
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
-		log.Println("Error compiling regular expression:", err)
 		return false
 	}
 

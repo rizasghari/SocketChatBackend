@@ -2,9 +2,10 @@ package handlers
 
 import (
 	"github.com/gin-gonic/gin"
-	"log"
 	"net/http"
+	"socketChat/internal/errs"
 	"socketChat/internal/models"
+	"socketChat/internal/msgs"
 	"socketChat/internal/services"
 )
 
@@ -39,16 +40,34 @@ func (h *Handler) Login(ctx *gin.Context) {
 }
 
 func (h *Handler) Register(ctx *gin.Context) {
+	var errors []error
+
 	var user models.User
 	err := ctx.BindJSON(&user)
 	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-	}
-	log.Println("Register - user: ", user)
-	register, err := h.authService.Register(&user)
-	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		errors = append(errors, errs.ErrInvalidRequestBody)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errors,
+		})
+		return
 	}
 
-	ctx.JSON(http.StatusOK, register)
+	register, registerErrs := h.authService.Register(&user)
+	if registerErrs != nil && len(registerErrs) > 0 {
+		errors = append(errors, registerErrs...)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errors,
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, models.Response{
+		Success: true,
+		Message: msgs.MsgUserCreatedSuccessfully,
+		Data:    register,
+	})
 }

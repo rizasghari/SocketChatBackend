@@ -1,6 +1,8 @@
 Websocket options:
 - Gorilla/websocket
 Web:
-- Fiber
+- gin
 Message Broker:
 - Redis
+Database:
+- Postgresql

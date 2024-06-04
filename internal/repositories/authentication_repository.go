@@ -1,8 +1,8 @@
 package repositories
 
 import (
-	"fmt"
 	"gorm.io/gorm"
+	"socketChat/internal/errs"
 	"socketChat/internal/models"
 )
 
@@ -16,15 +16,25 @@ func NewAuthenticationRepository(db *gorm.DB) *AuthenticationRepository {
 	}
 }
 
-func (ar *AuthenticationRepository) CreateUser(user *models.User) (*models.User, error) {
+func (ar *AuthenticationRepository) CreateUser(user *models.User) (*models.User, []error) {
+	var errors []error
 	result := ar.db.Create(user)
 	if result.Error != nil {
-		return nil, result.Error
+		errors = append(errors, result.Error)
+		return nil, errors
 	}
-
 	if result.RowsAffected == 0 {
-		return nil, fmt.Errorf("user not created")
+		errors = append(errors, errs.ErrUserNotFound)
+		return nil, errors
 	}
-
 	return user, nil
+}
+
+func (ar *AuthenticationRepository) CheckIfUserExists(email string) *models.User {
+	var user models.User
+	result := ar.db.Where("email = ?", email).First(&user)
+	if result.Error == nil && result.RowsAffected > 0 {
+		return &user
+	}
+	return nil
 }

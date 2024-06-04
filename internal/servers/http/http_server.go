@@ -12,8 +12,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"socketChat/internal/errs"
 	"socketChat/internal/handlers"
 	"socketChat/internal/models"
+	"socketChat/internal/msgs"
+	"socketChat/internal/utils"
 	"sync"
 	"syscall"
 )
@@ -87,10 +90,31 @@ func (hs *HttpServer) setupRestfulRoutes() {
 }
 
 func (hs *HttpServer) setupWebSocketRoutes() {
-	hs.router.GET("/ws/:userID", func(ctx *gin.Context) {
-		userID := ctx.Param("userID")
-		log.Println("User ID:", userID)
-		hs.handleConnections(ctx.Writer, ctx.Request, userID)
+	hs.router.GET("/ws", func(ctx *gin.Context) {
+		jwtToken := ctx.Query("Authorization")
+		log.Println("JWT:", jwtToken)
+
+		// Authenticate
+		if jwtToken == "" {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
+				Success: false,
+				Message: msgs.MsgOperationFailed,
+				Errors:  []error{errs.ErrUnauthorized},
+			})
+			return
+		}
+
+		claims, err := utils.VerifyToken(jwtToken, utils.GetJwtKey())
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
+				Success: false,
+				Message: msgs.MsgOperationFailed,
+				Errors:  []error{errs.ErrUnauthorized},
+			})
+			return
+		}
+
+		hs.handleConnections(ctx.Writer, ctx.Request, claims)
 	})
 }
 
@@ -110,7 +134,7 @@ func (hs *HttpServer) startServer() *http.Server {
 	return server
 }
 
-func (hs *HttpServer) handleConnections(w http.ResponseWriter, r *http.Request, userID string) {
+func (hs *HttpServer) handleConnections(w http.ResponseWriter, r *http.Request, claims *models.Claims) {
 	ws, err := hs.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("Failed to upgrade connection: %v", err)
@@ -123,9 +147,9 @@ func (hs *HttpServer) handleConnections(w http.ResponseWriter, r *http.Request, 
 		}
 	}(ws)
 
-	uid := parseUserID(userID)
-	if uid == 0 {
-		log.Printf("Invalid user ID: %v", userID)
+	userId := claims.ID
+	if userId == 0 {
+		log.Printf("Invalid user ID: %v", userId)
 		err := ws.Close()
 		if err != nil {
 			return
@@ -134,8 +158,12 @@ func (hs *HttpServer) handleConnections(w http.ResponseWriter, r *http.Request, 
 	}
 
 	hs.mu.Lock()
-	hs.clients[uid] = ws
+	hs.clients[userId] = ws
 	hs.mu.Unlock()
+
+	for id, client := range hs.clients {
+		log.Println("Client connected:", id, client.RemoteAddr())
+	}
 
 	for {
 		var msg models.TempSocketMessage
@@ -143,7 +171,7 @@ func (hs *HttpServer) handleConnections(w http.ResponseWriter, r *http.Request, 
 		if err != nil {
 			log.Printf("Error reading json: %v", err)
 			hs.mu.Lock()
-			delete(hs.clients, uid)
+			delete(hs.clients, userId)
 			hs.mu.Unlock()
 			break
 		}

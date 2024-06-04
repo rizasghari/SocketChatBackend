@@ -12,6 +12,8 @@ const (
 	ErrPasswordAtLeastOneLower    = Error("password must contain at least one lowercase letter")
 	ErrPasswordAtLeastOneUpper    = Error("password must contain at least one uppercase letter")
 
+	ErrUnauthorized = Error("unauthorized")
+
 	ErrInvalidRequestBody = Error("invalid request body")
 	ErrUserAlreadyExists  = Error("user already exists")
 	ErrUserNotFound       = Error("user not found")

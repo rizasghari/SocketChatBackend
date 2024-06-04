@@ -58,6 +58,8 @@ func (as *AuthenticationService) Login(loginData *models.LoginRequestBody) (*mod
 	token, jwtErr := utils.CreateJwtToken(
 		user.ID,
 		user.Email,
+		user.FirstName,
+		user.LastName,
 		utils.GetJwtKey(),
 		time.Unix(jwtExpiration, 0),
 	)

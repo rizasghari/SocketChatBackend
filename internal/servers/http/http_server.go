@@ -53,7 +53,7 @@ func (hs *HttpServer) Run() {
 	hs.setupRestfulRoutes()
 
 	// socket
-	//hs.StartSocket()
+	hs.StartSocket()
 
 	server := hs.startServer()
 
@@ -138,7 +138,7 @@ func (hs *HttpServer) handleConnections(w http.ResponseWriter, r *http.Request, 
 	hs.mu.Unlock()
 
 	for {
-		var msg models.Message
+		var msg models.TempSocketMessage
 		err := ws.ReadJSON(&msg)
 		if err != nil {
 			log.Printf("Error reading json: %v", err)
@@ -164,17 +164,17 @@ func (hs *HttpServer) handleConnections(w http.ResponseWriter, r *http.Request, 
 func (hs *HttpServer) handleRedisMessages() {
 	ch := hs.subscribeToChannel(hs.redis, "chat_channel")
 	for msg := range ch {
-		var message models.Message
+		var message models.TempSocketMessage
 		if err := json.Unmarshal([]byte(msg.Payload), &message); err != nil {
 			log.Printf("Error unmarshalling message: %v", err)
 			continue
 		}
 		// Send the message to the intended recipient
-		hs.sendMessageToClient(message.ConversationID, message)
+		hs.sendMessageToClient(message.ReceiverID, message)
 	}
 }
 
-func (hs *HttpServer) sendMessageToClient(receiverID uint, message models.Message) {
+func (hs *HttpServer) sendMessageToClient(receiverID uint, message models.TempSocketMessage) {
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
 

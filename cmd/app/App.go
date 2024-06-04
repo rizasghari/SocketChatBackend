@@ -45,7 +45,7 @@ func (app *App) LetsGo() {
 
 func (app *App) initializeRedis() {
 	app.redis = redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
+		Addr: "socket-chat-redis:6379",
 	})
 }
 

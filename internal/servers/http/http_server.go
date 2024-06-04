@@ -82,6 +82,8 @@ func (hs *HttpServer) initializeGin() {
 
 func (hs *HttpServer) setupRestfulRoutes() {
 	hs.router.GET("/", hs.handler.Index)
+	hs.router.POST("/login", hs.handler.Login)
+	hs.router.POST("/register", hs.handler.Register)
 }
 
 func (hs *HttpServer) setupWebSocketRoutes() {

@@ -13,6 +13,7 @@ type User struct {
 	ProfilePhoto *string    `json:"profile_photo"`
 	Email        string     `gorm:"unique;not null" json:"email"`
 	PasswordHash string     `gorm:"not null" json:"-"`
+	Password     string     `gorm:"-" json:"password"`
 	IsOnline     bool       `gorm:"default:false" json:"is_online"`
 	LastSeen     *time.Time `json:"last_seen"`
 }

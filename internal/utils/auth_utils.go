@@ -32,7 +32,7 @@ func GenerateSecretKey() string {
 	return base64.StdEncoding.EncodeToString(key)
 }
 
-func CreateJwtToken(id, email string, secretKey []byte, expiration time.Time) (string, error) {
+func CreateJwtToken(id uint, email string, secretKey []byte, expiration time.Time) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
 		models.Claims{
 			ID:    id,

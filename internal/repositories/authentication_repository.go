@@ -4,6 +4,7 @@ import (
 	"gorm.io/gorm"
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
+	"socketChat/internal/utils"
 )
 
 type AuthenticationRepository struct {
@@ -37,4 +38,19 @@ func (ar *AuthenticationRepository) CheckIfUserExists(email string) *models.User
 		return &user
 	}
 	return nil
+}
+
+func (ar *AuthenticationRepository) Login(login *models.LoginRequestBody) (*models.User, []error) {
+	var errors []error
+	var user *models.User
+	user = ar.CheckIfUserExists(login.Email)
+	if user == nil {
+		errors := append(errors, errs.ErrUserNotFound)
+		return nil, errors
+	}
+	if err := utils.CompareHashAndPassword(user.PasswordHash, login.Password); err != nil {
+		errors := append(errors, errs.ErrWrongPassword)
+		return nil, errors
+	}
+	return user, nil
 }

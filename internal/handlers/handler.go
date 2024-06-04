@@ -26,17 +26,36 @@ func (h *Handler) Index(ctx *gin.Context) {
 }
 
 func (h *Handler) Login(ctx *gin.Context) {
-	var login *models.Login
-	err := ctx.BindJSON(login)
+	var errors []error
+
+	var loginData *models.LoginRequestBody
+	err := ctx.BindJSON(loginData)
 	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-	}
-	user, err := h.authService.Login(login)
-	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		errors = append(errors, errs.ErrInvalidRequestBody)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errors,
+		})
+		return
 	}
 
-	ctx.JSON(http.StatusOK, user)
+	loginResponse, loginErrs := h.authService.Login(loginData)
+	if loginErrs != nil && len(loginErrs) > 0 {
+		errors = append(errors, loginErrs...)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errors,
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, models.Response{
+		Success: true,
+		Message: msgs.MsgOperationSuccessful,
+		Data:    loginResponse,
+	})
 }
 
 func (h *Handler) Register(ctx *gin.Context) {

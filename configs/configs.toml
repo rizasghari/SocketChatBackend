@@ -3,6 +3,9 @@
 [http]
 port = 8080
 
+[jwt]
+expiration_time = 3600
+
 [database]
 host = "socket-chat-db"
 port = 5432

@@ -31,7 +31,7 @@ func (h *Handler) AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		claims, err := utils.VerifyToken(jwtToken, jwtKey)
+		claims, err := utils.VerifyToken(jwtToken, utils.GetJwtKey())
 		if err != nil {
 			ctx.Redirect(http.StatusFound, "/login")
 			return

@@ -21,6 +21,7 @@ func NewAuthenticationService(
 ) *AuthenticationService {
 	return &AuthenticationService{
 		authRepo: authRepo,
+		config:   config,
 	}
 }
 
@@ -35,7 +36,7 @@ func (as *AuthenticationService) Register(user *models.User) (*models.User, []er
 		errors = append(errors, validationErrs...)
 		return nil, errors
 	}
-	password, err := utils.HashPassword(user.PasswordHash)
+	password, err := utils.HashPassword(user.Password)
 	if err != nil {
 		errors = append(errors, err)
 		return nil, errors
@@ -53,12 +54,12 @@ func (as *AuthenticationService) Login(loginData *models.LoginRequestBody) (*mod
 		return nil, errors
 	}
 
-	jwtExpiration := time.Now().Add(time.Duration(as.config.Viper.GetInt("jwt.expiration_time")) * time.Second)
+	jwtExpiration := time.Now().Add(time.Duration(as.config.Viper.GetInt("jwt.expiration_time")) * time.Second).Unix()
 	token, jwtErr := utils.CreateJwtToken(
 		user.ID,
 		user.Email,
-		[]byte(utils.GenerateSecretKey()),
-		jwtExpiration,
+		utils.GetJwtKey(),
+		time.Unix(jwtExpiration, 0),
 	)
 	if jwtErr != nil {
 		errors = append(errors, jwtErr)

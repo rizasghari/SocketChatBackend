@@ -18,8 +18,9 @@ func ValidateUser(user *models.User) []error {
 		errors = append(errors, errs.ErrInvalidEmail)
 	}
 
-	if !ValidatePassword(user.Password) {
-		errors = append(errors, errs.ErrInvalidPassword)
+	if passwordValidationErrs := ValidatePassword(user.Password); passwordValidationErrs != nil &&
+		len(passwordValidationErrs) > 0 {
+		errors = append(errors, passwordValidationErrs...)
 	}
 
 	if user.FirstName == "" || len(user.FirstName) < 2 {
@@ -42,22 +43,37 @@ func ValidateEmail(email string) bool {
 	return regex.MatchString(email)
 }
 
-func ValidatePassword(password string) bool {
-	// ^: Matches the start of the string.
-	// (?:[0-9a-zA-Z@#$%^&+=!]{8,}): Matches a string of at least 8 characters consisting of digits,
-	// letters (uppercase and lowercase), and special characters (@#$%^&+=!).
-	// (?:(.*[0-9])?(.*[a-z])?(.*[A-Z])?(.*[@#$%^&+=!])?): This part uses non-capturing groups ((?:...))
-	// and optional groups (?(...)?) to ensure the presence of at least one digit, one lowercase letter,
-	// one uppercase letter, and one special character.
-	// $: Matches the end of the string.
-	pattern := `^(?:[0-9a-zA-Z@#$%^&+=!]{8,})(?:(.*[0-9])?(.*[a-z])?(.*[A-Z])?(.*[@#$%^&+=!])?)$`
+func ValidatePassword(password string) []error {
+	var errors []error
 
-	// Compile the regular expression
-	regex, err := regexp.Compile(pattern)
-	if err != nil {
-		return false
+	// Check the length and valid characters
+	if len(password) < 8 {
+		errors = append(errors, errs.ErrPasswordAtLeast8Characters)
 	}
 
-	// Match the password against the pattern
-	return regex.MatchString(password)
+	// Check for at least one digit
+	hasDigit := `[0-9]`
+	if matched, _ := regexp.MatchString(hasDigit, password); !matched {
+		errors = append(errors, errs.ErrPasswordAtLeastOneDigit)
+	}
+
+	// Check for at least one lowercase letter
+	hasLower := `[a-z]`
+	if matched, _ := regexp.MatchString(hasLower, password); !matched {
+		errors = append(errors, errs.ErrPasswordAtLeastOneLower)
+	}
+
+	// Check for at least one uppercase letter
+	hasUpper := `[A-Z]`
+	if matched, _ := regexp.MatchString(hasUpper, password); !matched {
+		errors = append(errors, errs.ErrPasswordAtLeastOneUpper)
+	}
+
+	// Check for at least one special character
+	hasSpecial := `[@#$%^&+=!]`
+	if matched, _ := regexp.MatchString(hasSpecial, password); !matched {
+		errors = append(errors, errs.ErrPasswordAtLeastOneSpecial)
+	}
+
+	return errors
 }

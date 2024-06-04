@@ -2,14 +2,13 @@ package handlers
 
 import (
 	"github.com/gin-gonic/gin"
+	"log"
 	"net/http"
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
 	"socketChat/internal/msgs"
 	"socketChat/internal/services"
 )
-
-var jwtKey = []byte("aycEW3OtV+axBFZQL4cplAVRFMhSEc+xRrcHXxhTM8U=")
 
 type Handler struct {
 	authService *services.AuthenticationService
@@ -28,9 +27,10 @@ func (h *Handler) Index(ctx *gin.Context) {
 func (h *Handler) Login(ctx *gin.Context) {
 	var errors []error
 
-	var loginData *models.LoginRequestBody
-	err := ctx.BindJSON(loginData)
+	var loginData models.LoginRequestBody
+	err := ctx.BindJSON(&loginData)
 	if err != nil {
+		log.Println("Error login data json binding:", err)
 		errors = append(errors, errs.ErrInvalidRequestBody)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
 			Success: false,
@@ -40,7 +40,7 @@ func (h *Handler) Login(ctx *gin.Context) {
 		return
 	}
 
-	loginResponse, loginErrs := h.authService.Login(loginData)
+	loginResponse, loginErrs := h.authService.Login(&loginData)
 	if loginErrs != nil && len(loginErrs) > 0 {
 		errors = append(errors, loginErrs...)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
@@ -73,7 +73,7 @@ func (h *Handler) Register(ctx *gin.Context) {
 		return
 	}
 
-	register, registerErrs := h.authService.Register(&user)
+	_, registerErrs := h.authService.Register(&user)
 	if registerErrs != nil && len(registerErrs) > 0 {
 		errors = append(errors, registerErrs...)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
@@ -87,6 +87,5 @@ func (h *Handler) Register(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, models.Response{
 		Success: true,
 		Message: msgs.MsgUserCreatedSuccessfully,
-		Data:    register,
 	})
 }

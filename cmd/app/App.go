@@ -37,7 +37,7 @@ func (app *App) LetsGo() {
 
 	db := database.GetDB(app.configs)
 	authRepo := repositories.NewAuthenticationRepository(db)
-	authService := services.NewAuthenticationService(authRepo)
+	authService := services.NewAuthenticationService(authRepo, app.configs)
 	handler := handlers.NewHandler(authService)
 
 	http.NewHttpServer(app.ctx, app.redis, handler).Run()

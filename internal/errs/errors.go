@@ -5,6 +5,13 @@ type Error string
 func (e Error) Error() string { return string(e) }
 
 const (
+	ErrInvalidPassword            = Error("invalid password")
+	ErrPasswordAtLeast8Characters = Error("password must be at least 8 characters long")
+	ErrPasswordAtLeastOneDigit    = Error("password must contain at least one digit")
+	ErrPasswordAtLeastOneSpecial  = Error("password must contain at least one special character")
+	ErrPasswordAtLeastOneLower    = Error("password must contain at least one lowercase letter")
+	ErrPasswordAtLeastOneUpper    = Error("password must contain at least one uppercase letter")
+
 	ErrInvalidRequestBody = Error("invalid request body")
 	ErrUserAlreadyExists  = Error("user already exists")
 	ErrUserNotFound       = Error("user not found")
@@ -14,7 +21,6 @@ const (
 	ErrWrongToken         = Error("wrong token")
 	ErrInvalidToken       = Error("invalid token")
 	ErrInvalidEmail       = Error("invalid email")
-	ErrInvalidPassword    = Error("invalid password")
 	ErrInvalidUser        = Error("invalid user")
 	ErrInvalidRequest     = Error("invalid request")
 	ErrInvalidParams      = Error("invalid params")

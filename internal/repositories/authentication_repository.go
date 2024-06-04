@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"gorm.io/gorm"
+	"log"
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
 	"socketChat/internal/utils"
@@ -45,11 +46,12 @@ func (ar *AuthenticationRepository) Login(login *models.LoginRequestBody) (*mode
 	var user *models.User
 	user = ar.CheckIfUserExists(login.Email)
 	if user == nil {
-		errors := append(errors, errs.ErrUserNotFound)
+		errors = append(errors, errs.ErrUserNotFound)
 		return nil, errors
 	}
+	log.Printf("Password: %v Hash: %v", login.Password, user.PasswordHash)
 	if err := utils.CompareHashAndPassword(user.PasswordHash, login.Password); err != nil {
-		errors := append(errors, errs.ErrWrongPassword)
+		errors = append(errors, errs.ErrWrongPassword)
 		return nil, errors
 	}
 	return user, nil

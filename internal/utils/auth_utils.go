@@ -78,3 +78,7 @@ func IsAuthenticated(ctx *gin.Context, jwtKey []byte) bool {
 
 	return true
 }
+
+func GetJwtKey() []byte {
+	return []byte("aycEW3OtV+axBFZQL4cplAVRFMhSEc+xRrcHXxhTM8U=")
+}

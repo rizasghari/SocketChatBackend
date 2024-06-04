@@ -1,0 +1,20 @@
+[app]
+
+[http]
+port = 8080
+
+[database]
+host = "socket-chat-db"
+port = 5432
+user = "postgres"
+password = "postgres"
+name = "socket_chat_db"
+ssl = "disable"
+timezone = "Europe/Istanbul"
+
+[redis]
+host = "chat-redis"
+port = 6379
+password = "ChatRedisPassword"
+# Cache duration in seconds
+cache = 3600

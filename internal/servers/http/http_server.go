@@ -1,4 +1,4 @@
-package servers
+package http
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"socketChat/internal/handlers"
 	"socketChat/internal/models"
 	"sync"
 	"syscall"
@@ -24,19 +25,21 @@ var (
 
 type HttpServer struct {
 	mu       sync.Mutex
-	rdb      *redis.Client
+	redis    *redis.Client
 	ctx      context.Context
 	upgrader websocket.Upgrader
 	clients  map[uint]*websocket.Conn
 	router   *gin.Engine
+	handler  *handlers.Handler
 }
 
-func NewHttpServer(ctx context.Context, rdb *redis.Client) *HttpServer {
+func NewHttpServer(ctx context.Context, redis *redis.Client, handler *handlers.Handler) *HttpServer {
 	once.Do(func() {
 		httpServer = &HttpServer{
 			ctx:     ctx,
-			rdb:     rdb,
+			redis:   redis,
 			clients: make(map[uint]*websocket.Conn),
+			handler: handler,
 		}
 	})
 	return httpServer
@@ -44,18 +47,24 @@ func NewHttpServer(ctx context.Context, rdb *redis.Client) *HttpServer {
 
 func (hs *HttpServer) Run() {
 
-	hs.initializeSocketUpgrader()
-
 	hs.initializeGin()
-	hs.setupRoutes()
 
-	// Start listening for incoming chat messages
-	go hs.handleRedisMessages()
+	// restful
+	hs.setupRestfulRoutes()
+
+	// socket
+	//hs.StartSocket()
 
 	server := hs.startServer()
 
 	// Wait for interrupt signal to gracefully shut down the server
 	hs.waitForShutdown(server)
+}
+
+func (hs *HttpServer) StartSocket() {
+	hs.initializeSocketUpgrader()
+	hs.setupWebSocketRoutes()
+	go hs.handleRedisMessages()
 }
 
 func (hs *HttpServer) initializeSocketUpgrader() {
@@ -71,12 +80,11 @@ func (hs *HttpServer) initializeGin() {
 	hs.router.LoadHTMLGlob("./*.html")
 }
 
-func (hs *HttpServer) setupRoutes() {
-	hs.router.GET("/", func(ctx *gin.Context) {
-		ctx.HTML(http.StatusOK, "index.html", nil)
-	})
+func (hs *HttpServer) setupRestfulRoutes() {
+	hs.router.GET("/", hs.handler.Index)
+}
 
-	// WebSocket endpoint
+func (hs *HttpServer) setupWebSocketRoutes() {
 	hs.router.GET("/ws/:userID", func(ctx *gin.Context) {
 		userID := ctx.Param("userID")
 		log.Println("User ID:", userID)
@@ -145,14 +153,14 @@ func (hs *HttpServer) handleConnections(w http.ResponseWriter, r *http.Request, 
 			continue
 		}
 
-		if err := hs.publishMessage(hs.rdb, "chat_channel", jsonMessage); err != nil {
+		if err := hs.publishMessage(hs.redis, "chat_channel", jsonMessage); err != nil {
 			log.Printf("Error publishing message: %v", err)
 		}
 	}
 }
 
 func (hs *HttpServer) handleRedisMessages() {
-	ch := hs.subscribeToChannel(hs.rdb, "chat_channel")
+	ch := hs.subscribeToChannel(hs.redis, "chat_channel")
 	for msg := range ch {
 		var message models.Message
 		if err := json.Unmarshal([]byte(msg.Payload), &message); err != nil {
@@ -160,7 +168,7 @@ func (hs *HttpServer) handleRedisMessages() {
 			continue
 		}
 		// Send the message to the intended recipient
-		hs.sendMessageToClient(message.ReceiverID, message)
+		hs.sendMessageToClient(message.ConversationID, message)
 	}
 }
 

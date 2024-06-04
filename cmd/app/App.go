@@ -3,7 +3,12 @@ package app
 import (
 	"context"
 	"github.com/redis/go-redis/v9"
-	"socketChat/internal/servers"
+	"socketChat/configs"
+	"socketChat/internal/handlers"
+	"socketChat/internal/repositories"
+	"socketChat/internal/servers/database"
+	"socketChat/internal/servers/http"
+	"socketChat/internal/services"
 	"sync"
 )
 
@@ -13,8 +18,9 @@ var (
 )
 
 type App struct {
-	rdb *redis.Client
-	ctx context.Context
+	redis   *redis.Client
+	ctx     context.Context
+	configs *configs.Config
 }
 
 func GetApp() *App {
@@ -27,11 +33,22 @@ func GetApp() *App {
 func (app *App) LetsGo() {
 	app.ctx = context.Background()
 	app.initializeRedis()
-	servers.NewHttpServer(app.ctx, app.rdb).Run()
+	app.initializeConfigs()
+
+	db := database.GetDB(app.configs)
+	authRepo := repositories.NewAuthenticationRepository(db)
+	authService := services.NewAuthenticationService(authRepo)
+	handler := handlers.NewHandler(authService)
+
+	http.NewHttpServer(app.ctx, app.redis, handler).Run()
 }
 
 func (app *App) initializeRedis() {
-	app.rdb = redis.NewClient(&redis.Options{
+	app.redis = redis.NewClient(&redis.Options{
 		Addr: "localhost:6379",
 	})
+}
+
+func (app *App) initializeConfigs() {
+	app.configs = configs.GetConfig()
 }

@@ -107,5 +107,19 @@ func (h *Handler) CreateConversation(ctx *gin.Context) {
 		return
 	}
 
-	h.chatService.CreateConversation(&createConversationRequestBody)
+	conversation, errors := h.chatService.CreateConversation(&createConversationRequestBody)
+	if len(errors) > 0 {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errors,
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, models.Response{
+		Success: true,
+		Message: msgs.MsgOperationSuccessful,
+		Data:    conversation,
+	})
 }

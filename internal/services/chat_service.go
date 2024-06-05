@@ -15,7 +15,7 @@ func NewChatService(chatRepo *repositories.ChatRepository) *ChatService {
 	}
 }
 
-func (cs *ChatService) CreateConversation(conversation *models.CreateConversationRequestBody) (*models.Conversation, []error) {
+func (cs *ChatService) CreateConversation(conversationData *models.CreateConversationRequestBody) (*models.Conversation, []error) {
 	// TODO: Add conversation validation
-	return cs.chatRepo.CreateConversation(conversation)
+	return cs.chatRepo.CreateConversation(conversationData)
 }

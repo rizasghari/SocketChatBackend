@@ -1,7 +1,6 @@
 package repositories
 
 import (
-	"socketChat/internal/errs"
 	"socketChat/internal/models"
 
 	"gorm.io/gorm"

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
@@ -13,7 +14,6 @@ import (
 
 func (h *Handler) MustAuthenticateMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		var jwtToken string
 		jwtTokenFromHeader := ctx.GetHeader("Authorization")
 		if jwtTokenFromHeader != "" {
 			if strings.Contains(jwtTokenFromHeader, "Bearer") {
@@ -22,6 +22,7 @@ func (h *Handler) MustAuthenticateMiddleware() gin.HandlerFunc {
 		}
 
 		if jwtTokenFromHeader == "" {
+			log.Println("JWT token not found")
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
 				Success: false,
 				Message: msgs.MsgOperationFailed,
@@ -30,8 +31,9 @@ func (h *Handler) MustAuthenticateMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		claims, err := utils.VerifyToken(jwtToken, utils.GetJwtKey())
+		claims, err := utils.VerifyToken(jwtTokenFromHeader, utils.GetJwtKey())
 		if err != nil {
+			log.Println("JWT token verification failed:", err)
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
 				Success: false,
 				Message: msgs.MsgYouMustLoginFirst,

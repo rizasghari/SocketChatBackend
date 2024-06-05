@@ -52,10 +52,13 @@ func (hs *HttpServer) initializeGin() {
 }
 
 func (hs *HttpServer) setupRestfulRoutes() {
+	web := hs.router.Group("/")
+	{
+		web.GET("/", hs.handler.Index)
+	}
 
 	v1 := hs.router.Group("/api/v1")
 	{
-		v1.GET("/", hs.handler.Index)
 		v1.POST("/login", hs.handler.Login)
 		v1.POST("/register", hs.handler.Register)
 	}
@@ -65,7 +68,6 @@ func (hs *HttpServer) setupRestfulRoutes() {
 	{
 		v1_authenticated.POST("/conversations", hs.handler.CreateConversation)
 	}
-
 }
 
 func (hs *HttpServer) setupWebSocketRoutes() {

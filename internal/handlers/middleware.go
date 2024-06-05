@@ -1,44 +1,49 @@
 package handlers
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
+	"socketChat/internal/errs"
+	"socketChat/internal/models"
+	"socketChat/internal/msgs"
 	"socketChat/internal/utils"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
-func (h *Handler) AuthMiddleware() gin.HandlerFunc {
+func (h *Handler) MustAuthenticateMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var jwtToken string
 		jwtTokenFromHeader := ctx.GetHeader("Authorization")
 		if jwtTokenFromHeader != "" {
 			if strings.Contains(jwtTokenFromHeader, "Bearer") {
-				jwtToken = strings.Replace(jwtTokenFromHeader, "Bearer ", "", 1)
-			} else {
-				jwtToken = jwtTokenFromHeader
+				jwtTokenFromHeader = strings.Replace(jwtTokenFromHeader, "Bearer ", "", 1)
 			}
-		} else {
-			jwtTokenFromCookie, err := ctx.Cookie("jwt_token")
-			if err != nil {
-				ctx.Redirect(http.StatusFound, "/login")
-				return
-			}
-			jwtToken = jwtTokenFromCookie
 		}
 
-		if jwtToken == "" {
-			ctx.Redirect(http.StatusFound, "/login")
+		if jwtTokenFromHeader == "" {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
+				Success: false,
+				Message: msgs.MsgOperationFailed,
+				Errors:  []error{errs.ErrUnauthorized},
+			})
 			return
 		}
 
 		claims, err := utils.VerifyToken(jwtToken, utils.GetJwtKey())
 		if err != nil {
-			ctx.Redirect(http.StatusFound, "/login")
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
+				Success: false,
+				Message: msgs.MsgYouMustLoginFirst,
+				Errors:  []error{errs.ErrUnauthorized},
+			})
 			return
 		}
 
 		ctx.Set("user_id", claims.ID)
 		ctx.Set("user_email", claims.Email)
+		ctx.Set("user_first_name", claims.FirstName)
+		ctx.Set("user_last_name", claims.LastName)
 		ctx.Set("authenticated", true)
 		ctx.Next()
 	}

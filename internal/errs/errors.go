@@ -14,6 +14,8 @@ const (
 
 	ErrUnauthorized = Error("unauthorized")
 
+	ErrConversationCreationFailed = Error("conversation creation failed")
+
 	ErrInvalidRequestBody = Error("invalid request body")
 	ErrUserAlreadyExists  = Error("user already exists")
 	ErrUserNotFound       = Error("user not found")

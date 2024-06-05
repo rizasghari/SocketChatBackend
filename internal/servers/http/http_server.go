@@ -30,7 +30,7 @@ func NewHttpServer(ctx context.Context, redis *redis.Client, handler *handlers.H
 			handler: handler,
 			redis:   redis,
 			ctx:     ctx,
-			socket: handlers.NewSocket(redis, ctx),
+			socket:  handlers.NewSocket(redis, ctx),
 		}
 	})
 	return httpServer
@@ -52,9 +52,20 @@ func (hs *HttpServer) initializeGin() {
 }
 
 func (hs *HttpServer) setupRestfulRoutes() {
-	hs.router.GET("/", hs.handler.Index)
-	hs.router.POST("/login", hs.handler.Login)
-	hs.router.POST("/register", hs.handler.Register)
+
+	v1 := hs.router.Group("/api/v1")
+	{
+		v1.GET("/", hs.handler.Index)
+		v1.POST("/login", hs.handler.Login)
+		v1.POST("/register", hs.handler.Register)
+	}
+
+	v1_authenticated := v1.Group("/protected")
+	v1_authenticated.Use(hs.handler.MustAuthenticateMiddleware())
+	{
+		v1_authenticated.POST("/conversations", hs.handler.CreateConversation)
+	}
+
 }
 
 func (hs *HttpServer) setupWebSocketRoutes() {

@@ -12,11 +12,13 @@ import (
 
 type Handler struct {
 	authService *services.AuthenticationService
+	chatService *services.ChatService
 }
 
-func NewHandler(authService *services.AuthenticationService) *Handler {
+func NewHandler(authService *services.AuthenticationService, chatService *services.ChatService) *Handler {
 	return &Handler{
 		authService: authService,
+		chatService: chatService,
 	}
 }
 
@@ -88,4 +90,22 @@ func (h *Handler) Register(ctx *gin.Context) {
 		Success: true,
 		Message: msgs.MsgUserCreatedSuccessfully,
 	})
+}
+
+func (h *Handler) CreateConversation(ctx *gin.Context) {
+	var errors []error
+
+	var createConversationRequestBody models.CreateConversationRequestBody
+	err := ctx.BindJSON(&createConversationRequestBody)
+	if err != nil {
+		errors = append(errors, errs.ErrInvalidRequestBody)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errors,
+		})
+		return
+	}
+
+	h.chatService.CreateConversation(&createConversationRequestBody)
 }

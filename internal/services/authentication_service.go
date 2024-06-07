@@ -87,6 +87,6 @@ func (as *AuthenticationService) GetAllUsersWithPagination(page, size int) (*mod
 		return nil, errrors
 	}
 	offset := (page - 1) * size
-	log.Println("Offset: ", offset)
+	log.Println("Offset: ", offset, " Page: ", page, " Size: ", size)
 	return as.authRepo.GetAllUsersWithPagination(page, size, offset)
 }

@@ -65,11 +65,16 @@ func (ar *AuthenticationRepository) GetAllUsersWithPagination(page, limit, offse
 	var total int64
 
 	transactionErr := ar.db.Transaction(func(tx *gorm.DB) error {
-		result := tx.Select([]string{"ID", "first_name", "last_name", "profile_photo", "is_online", "last_seen"}).
-			Find(&users).
-			Where("deleted_at IS NULL").Order("created_at desc").
+
+		log.Println("AuthenticationRepository Page: ", page, " Limit: ", limit, " Offset: ", offset)
+
+		result := tx.
 			Offset(offset).
-			Limit(limit)
+			Limit(limit).
+			Select([]string{"ID", "first_name", "last_name", "profile_photo", "is_online", "last_seen"}).
+			Find(&users).
+			Where("deleted_at IS NULL")
+
 		if err := result.Error; err != nil {
 			return err
 		}

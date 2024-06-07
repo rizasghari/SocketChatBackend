@@ -1,7 +1,6 @@
 package services
 
 import (
-	"log"
 	"socketChat/configs"
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
@@ -33,7 +32,7 @@ func (as *AuthenticationService) Register(user *models.User) (*models.User, []er
 		return nil, errors
 	}
 	validationErrs := validators.ValidateUser(user)
-	if validationErrs != nil && len(validationErrs) > 0 {
+	if len(validationErrs) > 0 {
 		errors = append(errors, validationErrs...)
 		return nil, errors
 	}
@@ -82,11 +81,8 @@ func (as *AuthenticationService) CheckIfUserExists(email string) bool {
 func (as *AuthenticationService) GetAllUsersWithPagination(page, size int) (*models.GetUsersResponse, []error) {
 	var errrors []error
 	if page < 0 || size < 0 {
-		log.Println("Page or size < 0")
 		errrors = append(errrors, errs.ErrInvalidPageOrSize)
 		return nil, errrors
 	}
-	offset := (page - 1) * size
-	log.Println("Offset: ", offset, " Page: ", page, " Size: ", size)
-	return as.authRepo.GetAllUsersWithPagination(page, size, offset)
+	return as.authRepo.GetAllUsersWithPagination(page, size)
 }

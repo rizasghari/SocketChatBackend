@@ -58,31 +58,25 @@ func (ar *AuthenticationRepository) Login(login *models.LoginRequestBody) (*mode
 	return user, nil
 }
 
-func (ar *AuthenticationRepository) GetAllUsersWithPagination(page, limit, offset int) (*models.GetUsersResponse, []error) {
+func (ar *AuthenticationRepository) GetAllUsersWithPagination(page, size int) (*models.GetUsersResponse, []error) {
 	var users []models.User
 	var userResponses []models.UserResponse
 	var errors []error
 	var total int64
 
 	transactionErr := ar.db.Transaction(func(tx *gorm.DB) error {
-
-		log.Println("AuthenticationRepository Page: ", page, " Limit: ", limit, " Offset: ", offset)
-
 		result := tx.
-			Offset(offset).
-			Limit(limit).
+			Scopes(utils.Paginate(page, size)).
 			Select([]string{"ID", "first_name", "last_name", "profile_photo", "is_online", "last_seen"}).
 			Find(&users).
 			Where("deleted_at IS NULL")
-
 		if err := result.Error; err != nil {
 			return err
 		}
 		if result.RowsAffected == 0 {
 			return errs.ErrThereIsNoUser
 		}
-		err := ar.db.Model(&models.User{}).Where("deleted_at IS NULL").Count(&total).Error
-		if err != nil {
+		if err := ar.db.Model(&models.User{}).Where("deleted_at IS NULL").Count(&total).Error; err != nil {
 			return err
 		}
 
@@ -90,7 +84,6 @@ func (ar *AuthenticationRepository) GetAllUsersWithPagination(page, limit, offse
 	})
 
 	if transactionErr != nil {
-		log.Println("Transaction error: ", transactionErr)
 		errors = append(errors, transactionErr)
 		return nil, errors
 	}
@@ -102,7 +95,7 @@ func (ar *AuthenticationRepository) GetAllUsersWithPagination(page, limit, offse
 	usersResponse := &models.GetUsersResponse{
 		Users: userResponses,
 		Page:  page,
-		Size:  limit,
+		Size:  size,
 		Total: total,
 	}
 

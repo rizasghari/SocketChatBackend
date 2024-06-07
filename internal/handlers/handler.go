@@ -139,8 +139,6 @@ func (h *Handler) GetAllUsers(ctx *gin.Context) {
     if err != nil || sizeInt < 1 {
         sizeInt = 10
     }
-
-	log.Println("page:", pageInt, "size:", sizeInt)
 	
 	response, errs := h.authService.GetAllUsersWithPagination(pageInt, sizeInt)
 	if len(errs) > 0 {

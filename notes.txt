@@ -6,3 +6,5 @@ Message Broker:
 - Redis
 Database:
 - Postgresql
+File Storage
+- minio

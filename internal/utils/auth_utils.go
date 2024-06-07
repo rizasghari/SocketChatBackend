@@ -84,3 +84,8 @@ func IsAuthenticated(ctx *gin.Context, jwtKey []byte) bool {
 func GetJwtKey() []byte {
 	return []byte("aycEW3OtV+axBFZQL4cplAVRFMhSEc+xRrcHXxhTM8U=")
 }
+
+
+func GetUserIdFromContext(ctx *gin.Context) uint {
+	return ctx.MustGet("user_id").(uint)
+}

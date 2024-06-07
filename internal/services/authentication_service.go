@@ -54,7 +54,7 @@ func (as *AuthenticationService) Login(loginData *models.LoginRequestBody) (*mod
 		return nil, errors
 	}
 
-	jwtExpiration := time.Now().Add(time.Duration(as.config.Viper.GetInt("jwt.expiration_time")) * time.Second).Unix()
+	jwtExpiration := time.Now().Add(time.Duration(as.config.Viper.GetInt("jwt.expiration_time")) * time.Hour).Unix()
 	token, jwtErr := utils.CreateJwtToken(
 		user.ID,
 		user.Email,
@@ -107,4 +107,13 @@ func (as *AuthenticationService) GetSingleUser(id int) (*models.UserResponse, []
 	}
 
 	return userResponse, nil
+}
+
+func (as *AuthenticationService) UpdateUserProfilePhoto(id uint, photo string) []error {
+	var errors []error
+	if id <= 0 {
+		errors = append(errors, errs.ErrInvalidParams)
+		return errors
+	}
+	return as.authRepo.UpdateUserProfilePhoto(id, photo)
 }

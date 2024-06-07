@@ -55,9 +55,10 @@ func (chr *ChatRepository) CreateConversation(conversationData *models.CreateCon
 	return conversation, nil
 }
 
-func (chr *ChatRepository) GetUserConversations(userID, page, size int) (*models.ConversationListResponse, []error) {
+func (chr *ChatRepository) GetUserConversations(userID uint, page, size int) (*models.ConversationListResponse, []error) {
 	var errors []error
 	var conversations []models.Conversation
+	var conversationResponses []models.ConversationResponse
 	var total int64
 
 	transactionErr := chr.db.Transaction(func(tx *gorm.DB) error {
@@ -83,8 +84,13 @@ func (chr *ChatRepository) GetUserConversations(userID, page, size int) (*models
 		return nil, errors
 	}
 
+	for _, conversation := range conversations {
+		conversationResponses = append(conversationResponses, conversation.ToConversationResponse())
+
+	}
+
 	return &models.ConversationListResponse{
-		Conversations: conversations,
+		Conversations: conversationResponses,
 		Page:          page,
 		Size:          size,
 		Total:         total,

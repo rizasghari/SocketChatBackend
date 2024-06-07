@@ -40,7 +40,11 @@ func (app *App) LetsGo() {
 	authService := services.NewAuthenticationService(authRepo, app.configs)
 	chatRepo := repositories.NewChatRepository(db)
 	chatService := services.NewChatService(chatRepo)
-	handler := handlers.NewHandler(authService, chatService)
+
+	minioService := services.NewMinioService(app.configs)
+	fileManagerService := services.NewFileManagerService(minioService)
+
+	handler := handlers.NewHandler(authService, chatService, fileManagerService)
 
 	http.NewHttpServer(app.ctx, app.redis, handler).Run()
 }

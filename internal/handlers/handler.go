@@ -1,26 +1,36 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
+	"socketChat/internal/enums"
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
 	"socketChat/internal/msgs"
 	"socketChat/internal/services"
+	"socketChat/internal/utils"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {
-	authService *services.AuthenticationService
-	chatService *services.ChatService
+	authService        *services.AuthenticationService
+	chatService        *services.ChatService
+	fileManagerService *services.FileManagerService
 }
 
-func NewHandler(authService *services.AuthenticationService, chatService *services.ChatService) *Handler {
+func NewHandler(
+	authService *services.AuthenticationService,
+	chatService *services.ChatService,
+	fileManagerService *services.FileManagerService,
+) *Handler {
 	return &Handler{
-		authService: authService,
-		chatService: chatService,
+		authService:        authService,
+		chatService:        chatService,
+		fileManagerService: fileManagerService,
 	}
 }
 
@@ -131,15 +141,15 @@ func (h *Handler) GetAllUsersWithPagination(ctx *gin.Context) {
 	size := ctx.Query("size")
 
 	pageInt, err := strconv.Atoi(page)
-    if err != nil || pageInt < 1 {
-        pageInt = 1
-    }
+	if err != nil || pageInt < 1 {
+		pageInt = 1
+	}
 
-    sizeInt, err := strconv.Atoi(size)
-    if err != nil || sizeInt < 1 {
-        sizeInt = 10
-    }
-	
+	sizeInt, err := strconv.Atoi(size)
+	if err != nil || sizeInt < 1 {
+		sizeInt = 10
+	}
+
 	response, errs := h.authService.GetAllUsersWithPagination(pageInt, sizeInt)
 	if len(errs) > 0 {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
@@ -148,7 +158,7 @@ func (h *Handler) GetAllUsersWithPagination(ctx *gin.Context) {
 			Errors:  errs,
 		})
 		return
-	}	
+	}
 	ctx.JSON(http.StatusOK, models.Response{
 		Success: true,
 		Message: msgs.MsgOperationSuccessful,
@@ -156,7 +166,7 @@ func (h *Handler) GetAllUsersWithPagination(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) GetSingleUser(ctx *gin.Context) {	
+func (h *Handler) GetSingleUser(ctx *gin.Context) {
 	id := ctx.Param("id")
 
 	idInt, err := strconv.Atoi(id)
@@ -177,7 +187,7 @@ func (h *Handler) GetSingleUser(ctx *gin.Context) {
 			Errors:  errs,
 		})
 		return
-	}	
+	}
 	ctx.JSON(http.StatusOK, models.Response{
 		Success: true,
 		Message: msgs.MsgOperationSuccessful,
@@ -208,7 +218,48 @@ func (h *Handler) GetUserConversations(ctx *gin.Context) {
 			Errors:  []error{errs.ErrInvalidParams},
 		})
 		return
-	}	
+	}
+
+	conversationsResponse, errs := h.chatService.GetUserConversations(uint(idInt), pageInt, sizeInt)
+	if len(errs) > 0 {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errs,
+		})
+		return
+	}
+	ctx.JSON(http.StatusOK, models.Response{
+		Success: true,
+		Message: msgs.MsgOperationSuccessful,
+		Data:    conversationsResponse,
+	})
+}
+
+func (h *Handler) GetUserConversationsByToken(ctx *gin.Context) {
+	page := ctx.Query("page")
+	size := ctx.Query("size")
+
+	pageInt, err := strconv.Atoi(page)
+	if err != nil || pageInt < 1 {
+		pageInt = 1
+	}
+
+	sizeInt, err := strconv.Atoi(size)
+	if err != nil || sizeInt < 1 {
+		sizeInt = 10
+	}
+
+	idInt := ctx.MustGet("user_id").(uint)
+	if err != nil || idInt < 1 {
+		log.Println("User id not found")
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrUnauthorized},
+		})
+		return
+	}
 
 	conversationsResponse, errs := h.chatService.GetUserConversations(idInt, pageInt, sizeInt)
 	if len(errs) > 0 {
@@ -218,10 +269,75 @@ func (h *Handler) GetUserConversations(ctx *gin.Context) {
 			Errors:  errs,
 		})
 		return
-	}	
+	}
 	ctx.JSON(http.StatusOK, models.Response{
 		Success: true,
 		Message: msgs.MsgOperationSuccessful,
 		Data:    conversationsResponse,
+	})
+}
+
+func (h *Handler) UploadUserProfilePhoto(ctx *gin.Context) {
+	userID := utils.GetUserIdFromContext(ctx)
+	if userID < 1 {
+		log.Println("User id not found")
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrUnauthorized},
+		})
+		return
+	}
+
+	file, err := ctx.FormFile("profile_photo")
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrNoFileUploaded},
+		})
+		return
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrUnableToOpenUploadedFile},
+		})
+		return
+	}
+	defer src.Close()
+
+	// Generate a unique file name based on user ID and original file extension
+	fileExt := filepath.Ext(file.Filename)
+	fileName := fmt.Sprintf("user_profile_photo_%s%s", strconv.Itoa(int(userID)), fileExt)
+
+	// Upload the file to MinIO
+	url, err := h.fileManagerService.UploadUserProfilePhoto(fileName, src, file.Size, file.Header.Get("Content-Type"), enums.FILE_BUCKET_USER_PROFILE)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrUnableToUploadFile},
+		})
+		return
+	}
+
+	// Update the user profile photo URL in the database
+	if updateErrs := h.authService.UpdateUserProfilePhoto(userID, url); updateErrs != nil {
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrUnableToUpdateProfilePhoto},
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, models.Response{
+		Success: true,
+		Message: msgs.MsgOperationSuccessful,
+		Data:    url,
 	})
 }

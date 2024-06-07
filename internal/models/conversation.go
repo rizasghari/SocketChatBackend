@@ -10,3 +10,15 @@ type Conversation struct {
 	Members  []User    `gorm:"many2many:conversation_members;"`
 	Messages []Message `json:"messages"`
 }
+
+func (conversation *Conversation) ToConversationResponse() ConversationResponse {
+	members := []UserResponse{}
+	for _, member := range conversation.Members {
+		members = append(members, member.ToUserResponse())
+	}
+	return ConversationResponse{
+		Type:    conversation.Type,
+		Name:    conversation.Name,
+		Members: members,
+	}
+}

@@ -117,3 +117,17 @@ func (ar *AuthenticationRepository) GetSingleUser(id int) (*models.UserResponse,
 	userResponse := user.ToUserResponse()
 	return &userResponse, nil
 }
+
+func (ar *AuthenticationRepository) UpdateUserProfilePhoto(id uint, photo string) []error {
+	var errors []error
+	result := ar.db.Model(&models.User{}).Where("id = ?", id).Update("profile_photo", photo)
+	if err := result.Error; err != nil {
+		errors = append(errors, err)
+		return errors
+	}
+	if result.RowsAffected == 0 {
+		errors = append(errors, errs.ErrUserNotFound)
+		return errors
+	}
+	return nil
+}

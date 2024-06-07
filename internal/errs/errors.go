@@ -16,6 +16,11 @@ const (
 
 	ErrConversationCreationFailed = Error("conversation creation failed")
 
+	ErrNoFileUploaded           = Error("no file uploaded")
+	ErrUnableToOpenUploadedFile = Error("unable to open uploaded file")
+	ErrUnableToUploadFile       = Error("unable to upload file")
+	ErrUnableToUpdateProfilePhoto = Error("unable to update profile photo")
+
 	ErrInvalidRequestBody = Error("invalid request body")
 	ErrUserAlreadyExists  = Error("user already exists")
 	ErrUserNotFound       = Error("user not found")

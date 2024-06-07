@@ -4,7 +4,7 @@
 port = 8080
 
 [jwt]
-expiration_time = 3600
+expiration_time = 24
 
 [database]
 host = "socket-chat-db"
@@ -21,3 +21,9 @@ port = 6379
 password = "ChatRedisPassword"
 # Cache duration in seconds
 cache = 3600
+
+[minio]
+endpoint = "socket-chat-minio:9000"
+access_key_id = "minioadmin"
+secret_access_key = "minioadmin"
+use_ssl = false

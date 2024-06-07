@@ -1,13 +1,15 @@
 package handlers
 
 import (
-	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
 	"socketChat/internal/msgs"
 	"socketChat/internal/services"
+	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {
@@ -76,7 +78,7 @@ func (h *Handler) Register(ctx *gin.Context) {
 	}
 
 	_, registerErrs := h.authService.Register(&user)
-	if registerErrs != nil && len(registerErrs) > 0 {
+	if len(registerErrs) > 0 {
 		errors = append(errors, registerErrs...)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
 			Success: false,
@@ -121,5 +123,37 @@ func (h *Handler) CreateConversation(ctx *gin.Context) {
 		Success: true,
 		Message: msgs.MsgOperationSuccessful,
 		Data:    conversation,
+	})
+}
+
+func (h *Handler) GetAllUsers(ctx *gin.Context) {
+	page := ctx.Query("page")
+	size := ctx.Query("size")
+
+	pageInt, err := strconv.Atoi(page)
+    if err != nil || pageInt < 1 {
+        pageInt = 1
+    }
+
+    sizeInt, err := strconv.Atoi(size)
+    if err != nil || sizeInt < 1 {
+        sizeInt = 10
+    }
+
+	log.Println("page:", pageInt, "size:", sizeInt)
+	
+	response, errs := h.authService.GetAllUsersWithPagination(pageInt, sizeInt)
+	if len(errs) > 0 {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errs,
+		})
+		return
+	}	
+	ctx.JSON(http.StatusOK, models.Response{
+		Success: true,
+		Message: msgs.MsgOperationSuccessful,
+		Data:    response,
 	})
 }

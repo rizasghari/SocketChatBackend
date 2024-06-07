@@ -1,11 +1,12 @@
 package repositories
 
 import (
-	"gorm.io/gorm"
 	"log"
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
 	"socketChat/internal/utils"
+
+	"gorm.io/gorm"
 )
 
 type AuthenticationRepository struct {
@@ -55,4 +56,41 @@ func (ar *AuthenticationRepository) Login(login *models.LoginRequestBody) (*mode
 		return nil, errors
 	}
 	return user, nil
+}
+
+func (ar *AuthenticationRepository) GetAllUsersWithPagination(page, limit, offset int) (*models.GetUsersResponse, []error) {
+	var users []models.User
+	var errors []error
+	var total int64
+
+	transactionErr := ar.db.Transaction(func(tx *gorm.DB) error {
+		result := tx.Find(&users).Where("deleted_at IS NULL").Order("created_at desc").Offset(offset).Limit(limit)
+		if err := result.Error; err != nil {
+			return err
+		}
+		if result.RowsAffected == 0 {
+			return errs.ErrThereIsNoUser
+		}
+		err := ar.db.Model(&models.User{}).Where("deleted_at IS NULL").Count(&total).Error
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if transactionErr != nil {
+		log.Println("Transaction error: ", transactionErr)
+		errors = append(errors, transactionErr)
+		return nil, errors
+	}
+
+	usersResponse := &models.GetUsersResponse{
+		Users: users,
+		Page:  page,
+		Size:  limit,
+		Total: total,
+	}
+
+	return usersResponse, errors
 }

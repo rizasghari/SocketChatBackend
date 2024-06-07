@@ -1,6 +1,7 @@
 package services
 
 import (
+	"log"
 	"socketChat/configs"
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
@@ -76,4 +77,16 @@ func (as *AuthenticationService) Login(loginData *models.LoginRequestBody) (*mod
 
 func (as *AuthenticationService) CheckIfUserExists(email string) bool {
 	return as.authRepo.CheckIfUserExists(email) != nil
+}
+
+func (as *AuthenticationService) GetAllUsersWithPagination(page, size int) (*models.GetUsersResponse, []error) {
+	var errrors []error
+	if page < 0 || size < 0 {
+		log.Println("Page or size < 0")
+		errrors = append(errrors, errs.ErrInvalidPageOrSize)
+		return nil, errrors
+	}
+	offset := (page - 1) * size
+	log.Println("Offset: ", offset)
+	return as.authRepo.GetAllUsersWithPagination(page, size, offset)
 }

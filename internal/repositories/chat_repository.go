@@ -116,8 +116,8 @@ func (chr *ChatRepository) GetMessagesByConversationId(conversationID uint, page
 		if err := tx.
 			Scopes(utils.Paginate(page, size)).
 			Where("conversation_id = ?", conversationID).
-			Find(&messages).
-			Order("created_at DESC").Error; err != nil {
+			Order("created_at DESC").
+			Find(&messages).Error; err != nil {
 			return err
 		}
 

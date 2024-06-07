@@ -168,7 +168,7 @@ func (h *Handler) GetSingleUser(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	user, errs := h.authService.GetSingleUser(idInt)
 	if len(errs) > 0 {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
@@ -182,5 +182,46 @@ func (h *Handler) GetSingleUser(ctx *gin.Context) {
 		Success: true,
 		Message: msgs.MsgOperationSuccessful,
 		Data:    user,
+	})
+}
+
+func (h *Handler) GetUserConversations(ctx *gin.Context) {
+	id := ctx.Param("id")
+	page := ctx.Query("page")
+	size := ctx.Query("size")
+
+	pageInt, err := strconv.Atoi(page)
+	if err != nil || pageInt < 1 {
+		pageInt = 1
+	}
+
+	sizeInt, err := strconv.Atoi(size)
+	if err != nil || sizeInt < 1 {
+		sizeInt = 10
+	}
+
+	idInt, err := strconv.Atoi(id)
+	if err != nil || idInt < 1 {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrInvalidParams},
+		})
+		return
+	}	
+
+	conversationsResponse, errs := h.chatService.GetUserConversations(idInt, pageInt, sizeInt)
+	if len(errs) > 0 {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errs,
+		})
+		return
+	}	
+	ctx.JSON(http.StatusOK, models.Response{
+		Success: true,
+		Message: msgs.MsgOperationSuccessful,
+		Data:    conversationsResponse,
 	})
 }

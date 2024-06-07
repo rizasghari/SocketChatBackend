@@ -19,3 +19,7 @@ func (cs *ChatService) CreateConversation(conversationData *models.CreateConvers
 	// TODO: Add conversation validation
 	return cs.chatRepo.CreateConversation(conversationData)
 }
+
+func (cs *ChatService) GetUserConversations(userID, page, size int) (*models.ConversationListResponse, []error) {
+	return cs.chatRepo.GetUserConversations(userID, page, size)
+}

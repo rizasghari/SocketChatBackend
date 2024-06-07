@@ -102,7 +102,7 @@ func (as *AuthenticationService) GetSingleUser(id int) (*models.UserResponse, []
 		return nil, errrors
 	}
 	if userResponse == nil {
-		errrors = append(errrors, errs.x)
+		errrors = append(errrors, errs.ErrUserNotFound)
 		return nil, errrors
 	}
 

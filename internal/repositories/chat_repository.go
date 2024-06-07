@@ -106,3 +106,39 @@ func (chr *ChatRepository) SendMessage(message *models.Message) (*models.Message
 
 	return message, nil
 }
+
+func (chr *ChatRepository) GetMessagesByConversationId(conversationID uint, page, size int) (*models.MessageListResponse, []error) {
+	var errors []error
+	var messages []models.Message
+	var total int64
+
+	transactionErr := chr.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.
+			Scopes(utils.Paginate(page, size)).
+			Where("conversation_id = ?", conversationID).
+			Find(&messages).
+			Order("created_at DESC").Error; err != nil {
+			return err
+		}
+
+		if err := tx.
+			Model(&models.Message{}).
+			Where("conversation_id = ?", conversationID).
+			Count(&total).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if transactionErr != nil {
+		errors = append(errors, transactionErr)
+		return nil, errors
+	}
+
+	return &models.MessageListResponse{
+		Messages: messages,
+		Page:     page,
+		Size:     size,
+		Total:    total,
+	}, nil
+}

@@ -389,3 +389,55 @@ func (h *Handler) SendMessage(ctx *gin.Context) {
 		Data:    msg,
 	})
 }
+
+func (h *Handler) GetMessagesByConversationID(ctx *gin.Context) {
+	conversationID := ctx.Param("id")
+
+	page := ctx.Query("page")
+	size := ctx.Query("size")
+
+	pageInt, err := strconv.Atoi(page)
+	if err != nil || pageInt < 1 {
+		pageInt = 1
+	}
+
+	sizeInt, err := strconv.Atoi(size)
+	if err != nil || sizeInt < 1 {
+		sizeInt = 10
+	}
+
+	if conversationID == "" {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrInvalidRequest},
+		})
+		return
+	}
+
+	conversationIdUint, err := strconv.Atoi(conversationID)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrInvalidRequest},
+		})
+		return
+	}
+
+	messages, errs := h.chatService.GetMessagesByConversationId(uint(conversationIdUint), pageInt, sizeInt)
+	if len(errs) > 0 {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errs,
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, models.Response{
+		Success: true,
+		Message: msgs.MsgOperationSuccessful,
+		Data:    messages,
+	})
+}

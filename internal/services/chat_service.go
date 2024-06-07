@@ -27,3 +27,7 @@ func (cs *ChatService) GetUserConversations(userID uint, page, size int) (*model
 func (cs *ChatService) SendMessage(message *models.Message) (*models.Message, []error) {
 	return cs.chatRepo.SendMessage(message)
 }
+
+func (cs *ChatService) GetMessagesByConversationId(conversationID uint, page, size int) (*models.MessageListResponse, []error) {
+	return cs.chatRepo.GetMessagesByConversationId(conversationID, page, size)
+}

@@ -75,7 +75,7 @@ func (hs *HttpServer) setupRestfulRoutes() {
 		authenticated.GET("/conversations/my", hs.handler.GetUserConversationsByToken)
 
 		authenticated.POST("/messages", hs.handler.SendMessage)
-		
+		authenticated.GET("/messages/conversation/:id", hs.handler.GetMessagesByConversationID)
 	}
 }
 

@@ -17,6 +17,7 @@ func (conversation *Conversation) ToConversationResponse() ConversationResponse 
 		members = append(members, member.ToUserResponse())
 	}
 	return ConversationResponse{
+		ID:      conversation.ID,
 		Type:    conversation.Type,
 		Name:    conversation.Name,
 		Members: members,

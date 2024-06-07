@@ -86,3 +86,25 @@ func (as *AuthenticationService) GetAllUsersWithPagination(page, size int) (*mod
 	}
 	return as.authRepo.GetAllUsersWithPagination(page, size)
 }
+
+func (as *AuthenticationService) GetSingleUser(id int) (*models.UserResponse, []error) {
+	var errrors []error
+
+	if id <= 0 {
+		errrors = append(errrors, errs.ErrInvalidParams)
+		return nil, errrors
+	}
+
+	userResponse, getUserErrs := as.authRepo.GetSingleUser(id)
+
+	if len(getUserErrs) > 0 {
+		errrors = append(errrors, getUserErrs...)
+		return nil, errrors
+	}
+	if userResponse == nil {
+		errrors = append(errrors, errs.x)
+		return nil, errrors
+	}
+
+	return userResponse, nil
+}

@@ -66,7 +66,8 @@ func (hs *HttpServer) setupRestfulRoutes() {
 	v1_authenticated := v1.Group("/")
 	v1_authenticated.Use(hs.handler.MustAuthenticateMiddleware())
 	{
-		v1_authenticated.GET("/users", hs.handler.GetAllUsers)
+		v1_authenticated.GET("/users", hs.handler.GetAllUsersWithPagination)
+		v1_authenticated.GET("/users/:id", hs.handler.GetSingleUser)
 		v1_authenticated.POST("/conversations", hs.handler.CreateConversation)
 	}
 }

@@ -126,7 +126,7 @@ func (h *Handler) CreateConversation(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) GetAllUsers(ctx *gin.Context) {
+func (h *Handler) GetAllUsersWithPagination(ctx *gin.Context) {
 	page := ctx.Query("page")
 	size := ctx.Query("size")
 
@@ -153,5 +153,34 @@ func (h *Handler) GetAllUsers(ctx *gin.Context) {
 		Success: true,
 		Message: msgs.MsgOperationSuccessful,
 		Data:    response,
+	})
+}
+
+func (h *Handler) GetSingleUser(ctx *gin.Context) {	
+	id := ctx.Param("id")
+
+	idInt, err := strconv.Atoi(id)
+	if err != nil || idInt < 1 {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrInvalidParams},
+		})
+		return
+	}
+	
+	user, errs := h.authService.GetSingleUser(idInt)
+	if len(errs) > 0 {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errs,
+		})
+		return
+	}	
+	ctx.JSON(http.StatusOK, models.Response{
+		Success: true,
+		Message: msgs.MsgOperationSuccessful,
+		Data:    user,
 	})
 }

@@ -101,3 +101,19 @@ func (ar *AuthenticationRepository) GetAllUsersWithPagination(page, size int) (*
 
 	return usersResponse, errors
 }
+
+func (ar *AuthenticationRepository) GetSingleUser(id int) (*models.UserResponse, []error) {
+	var errors []error
+	var user models.User
+	result := ar.db.Where("id = ? AND deleted_at IS NULL", id).First(&user)
+	if err := result.Error; err != nil {
+		errors = append(errors, err)
+		return nil, errors
+	}
+	if result.RowsAffected == 0 {
+		errors = append(errors, errs.ErrUserNotFound)
+		return nil, errors
+	}
+	userResponse := user.ToUserResponse()
+	return &userResponse, nil
+}

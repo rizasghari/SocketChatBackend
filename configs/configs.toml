@@ -24,6 +24,7 @@ cache = 3600
 
 [minio]
 endpoint = "socket-chat-minio:9000"
+external_endpoint = "localhost:9000"
 access_key_id = "minioadmin"
 secret_access_key = "minioadmin"
 use_ssl = false

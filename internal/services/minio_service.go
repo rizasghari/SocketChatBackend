@@ -15,6 +15,7 @@ import (
 
 type MinioService struct {
 	minioClient *minio.Client
+	config      *configs.Config
 }
 
 var (
@@ -53,6 +54,7 @@ func NewMinioService(config *configs.Config) *MinioService {
 
 		minioService = &MinioService{
 			minioClient: minioClient,
+			config:      config,
 		}
 	})
 
@@ -63,12 +65,22 @@ func NewMinioService(config *configs.Config) *MinioService {
 }
 
 func (ms *MinioService) UploadFile(fileName string, file io.Reader, fileSize int64, contentType string, bucketName string) (string, error) {
-	_, err := ms.minioClient.PutObject(context.Background(), bucketName, fileName, file, fileSize, minio.PutObjectOptions{ContentType: contentType})
+	info, err := ms.minioClient.PutObject(context.Background(), bucketName, fileName, file, fileSize, minio.PutObjectOptions{ContentType: contentType})
 	if err != nil {
 		log.Println(err)
 		return "", err
 	}
 
-	url := fmt.Sprintf("https://%s/%s/%s", ms.minioClient.EndpointURL().Host, bucketName, fileName)
-	return url, nil
+	publicUrl, err := ms.GetPublicFileUrl(bucketName, info.Key)
+	if err != nil {
+		log.Println(err)
+		return "", err
+	}
+	return publicUrl, nil
+}
+
+func (ms *MinioService) GetPublicFileUrl(bucketName, fileKey string) (string, error) {
+	externalEndpoint := ms.config.Viper.GetString("minio.external_endpoint")
+	path := fmt.Sprintf("http://%s/%s/%s", externalEndpoint, bucketName, fileKey)
+	return path, nil
 }

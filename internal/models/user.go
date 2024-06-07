@@ -17,3 +17,14 @@ type User struct {
 	IsOnline     bool       `gorm:"default:false" json:"is_online"`
 	LastSeen     *time.Time `json:"last_seen"`
 }
+
+func (user *User) ToUserResponse() UserResponse {
+	return UserResponse{
+		ID:           user.ID,
+		FirstName:    user.FirstName,
+		LastName:     user.LastName,
+		ProfilePhoto: user.ProfilePhoto,
+		IsOnline:     user.IsOnline,
+		LastSeen:     user.LastSeen,
+	}
+}

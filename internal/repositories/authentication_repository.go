@@ -60,11 +60,16 @@ func (ar *AuthenticationRepository) Login(login *models.LoginRequestBody) (*mode
 
 func (ar *AuthenticationRepository) GetAllUsersWithPagination(page, limit, offset int) (*models.GetUsersResponse, []error) {
 	var users []models.User
+	var userResponses []models.UserResponse
 	var errors []error
 	var total int64
 
 	transactionErr := ar.db.Transaction(func(tx *gorm.DB) error {
-		result := tx.Find(&users).Where("deleted_at IS NULL").Order("created_at desc").Offset(offset).Limit(limit)
+		result := tx.Select([]string{"ID", "first_name", "last_name", "profile_photo", "is_online", "last_seen"}).
+			Find(&users).
+			Where("deleted_at IS NULL").Order("created_at desc").
+			Offset(offset).
+			Limit(limit)
 		if err := result.Error; err != nil {
 			return err
 		}
@@ -85,8 +90,12 @@ func (ar *AuthenticationRepository) GetAllUsersWithPagination(page, limit, offse
 		return nil, errors
 	}
 
+	for _, user := range users {
+		userResponses = append(userResponses, user.ToUserResponse())
+	}
+
 	usersResponse := &models.GetUsersResponse{
-		Users: users,
+		Users: userResponses,
 		Page:  page,
 		Size:  limit,
 		Total: total,

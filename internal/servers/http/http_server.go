@@ -63,16 +63,19 @@ func (hs *HttpServer) setupRestfulRoutes() {
 		v1.POST("/register", hs.handler.Register)
 	}
 
-	v1_authenticated := v1.Group("/")
-	v1_authenticated.Use(hs.handler.MustAuthenticateMiddleware())
+	authenticated := v1.Group("/")
+	authenticated.Use(hs.handler.MustAuthenticateMiddleware())
 	{
-		v1_authenticated.GET("/users", hs.handler.GetAllUsersWithPagination)
-		v1_authenticated.GET("/users/:id", hs.handler.GetSingleUser)
-		v1_authenticated.POST("/users/upload-profile-photo", hs.handler.UploadUserProfilePhoto)
+		authenticated.GET("/users", hs.handler.GetAllUsersWithPagination)
+		authenticated.GET("/users/:id", hs.handler.GetSingleUser)
+		authenticated.POST("/users/upload-profile-photo", hs.handler.UploadUserProfilePhoto)
 
-		v1_authenticated.POST("/conversations", hs.handler.CreateConversation)
-		v1_authenticated.GET("/conversations/user/:id", hs.handler.GetUserConversations)
-		v1_authenticated.GET("/conversations/my", hs.handler.GetUserConversationsByToken)
+		authenticated.POST("/conversations", hs.handler.CreateConversation)
+		authenticated.GET("/conversations/user/:id", hs.handler.GetUserConversations)
+		authenticated.GET("/conversations/my", hs.handler.GetUserConversationsByToken)
+
+		authenticated.POST("/messages", hs.handler.SendMessage)
+		
 	}
 }
 

@@ -23,3 +23,7 @@ func (cs *ChatService) CreateConversation(conversationData *models.CreateConvers
 func (cs *ChatService) GetUserConversations(userID uint, page, size int) (*models.ConversationListResponse, []error) {
 	return cs.chatRepo.GetUserConversations(userID, page, size)
 }
+
+func (cs *ChatService) SendMessage(message *models.Message) (*models.Message, []error) {
+	return cs.chatRepo.SendMessage(message)
+}

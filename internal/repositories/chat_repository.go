@@ -96,3 +96,13 @@ func (chr *ChatRepository) GetUserConversations(userID uint, page, size int) (*m
 		Total:         total,
 	}, nil
 }
+
+func (chr *ChatRepository) SendMessage(message *models.Message) (*models.Message, []error) {
+	var errors []error
+	if err := chr.db.Create(message).Error; err != nil {
+		errors = append(errors, err)
+		return nil, errors
+	}
+
+	return message, nil
+}

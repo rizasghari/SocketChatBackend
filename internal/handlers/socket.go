@@ -38,11 +38,7 @@ func NewSocket(redis *redis.Client, ctx context.Context) *Socket {
 }
 
 func (s *Socket) HandleSocketRoute(ctx *gin.Context) {
-
-	log.Println("Socket HandleSocketRoute")
-
 	jwtToken := ctx.Request.Header.Get("Authorization")
-	log.Println("JWT:", jwtToken)
 
 	// Authenticate
 	if jwtToken == "" {
@@ -69,17 +65,11 @@ func (s *Socket) HandleSocketRoute(ctx *gin.Context) {
 }
 
 func (s *Socket) StartSocket() {
-
-	log.Println("Socket StartSocket")
-
 	s.InitializeSocketUpgrader()
 	go s.HandleRedisMessages()
 }
 
 func (s *Socket) InitializeSocketUpgrader() {
-
-	log.Println("Socket InitializeSocketUpgrader")
-
 	s.upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
@@ -88,9 +78,6 @@ func (s *Socket) InitializeSocketUpgrader() {
 }
 
 func (s *Socket) HandleConnections(ctx *gin.Context, userInfo *models.Claims) {
-
-	log.Println("Socket HandleConnections")
-
 	ws, err := s.upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
 		log.Printf("Failed to upgrade connection: %v", err)
@@ -148,9 +135,6 @@ func (s *Socket) HandleConnections(ctx *gin.Context, userInfo *models.Claims) {
 }
 
 func (s *Socket) HandleRedisMessages() {
-
-	log.Println("Socket HandleRedisMessages")
-
 	ch := s.SubscribeToChannel(s.hub.Redis, "chat_channel")
 	for msg := range ch {
 		var message models.TempSocketMessage
@@ -164,9 +148,6 @@ func (s *Socket) HandleRedisMessages() {
 }
 
 func (s *Socket) SendMessageToClient(receiverID uint, message models.TempSocketMessage) {
-
-	log.Println("Socket SendMessageToClient")
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -183,16 +164,10 @@ func (s *Socket) SendMessageToClient(receiverID uint, message models.TempSocketM
 }
 
 func (s *Socket) PublishMessage(redis *redis.Client, channel string, message []byte) error {
-
-	log.Println("Socket PublishMessage")
-
 	return redis.Publish(s.ctx, channel, message).Err()
 }
 
 func (hs *Socket) SubscribeToChannel(redis *redis.Client, channel string) <-chan *redis.Message {
-
-	log.Println("Socket SubscribeToChannel")
-
 	pubsub := redis.Subscribe(hs.ctx, channel)
 	_, err := pubsub.Receive(hs.ctx)
 	if err != nil {
@@ -202,9 +177,6 @@ func (hs *Socket) SubscribeToChannel(redis *redis.Client, channel string) <-chan
 }
 
 func (s *Socket) WaitForShutdown(httpServer *http.Server) {
-
-	log.Println("Socket WaitForShutdown")
-
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit

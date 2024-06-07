@@ -341,3 +341,51 @@ func (h *Handler) UploadUserProfilePhoto(ctx *gin.Context) {
 		Data:    url,
 	})
 }
+
+func (h *Handler) SendMessage(ctx *gin.Context) {
+	senderID := utils.GetUserIdFromContext(ctx)
+	if senderID < 1 {
+		log.Println("User id not found")
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrUnauthorized},
+		})
+		return
+	}
+
+	var messageRequest models.MessageRequest
+	if err := ctx.ShouldBindJSON(&messageRequest); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrInvalidRequest},
+		})
+		return
+	}
+
+	message := &models.Message{
+		ConversationID: messageRequest.ConversationID,
+		Content:        messageRequest.Content,
+		SenderID:       senderID,
+	}
+
+	msg, errs := h.chatService.SendMessage(message)
+	if len(errs) > 0 {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errs,
+		})
+		return
+	}
+
+	// Todo: Send socket event
+	// Todo: Send notification
+
+	ctx.JSON(http.StatusOK, models.Response{
+		Success: true,
+		Message: msgs.MsgOperationSuccessful,
+		Data:    msg,
+	})
+}

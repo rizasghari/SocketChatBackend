@@ -148,3 +148,9 @@ func (chr *ChatRepository) CheckConversationExists(conversationID uint) bool {
 	chr.db.Model(&models.Conversation{}).Where("id = ?", conversationID).Count(&count)
 	return count > 0
 }
+
+func (chr *ChatRepository) CheckUserInConversation(userID, conversationID uint) bool {
+	var count int64
+	chr.db.Model(&models.ConversationMember{}).Where("user_id = ? AND conversation_id = ?", userID, conversationID).Count(&count)
+	return count > 0
+}

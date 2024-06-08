@@ -35,3 +35,7 @@ func (cs *ChatService) GetMessagesByConversationId(conversationID uint, page, si
 func (cs *ChatService) CheckConversationExists(conversationID uint) bool {
 	return cs.chatRepo.CheckConversationExists(conversationID)
 }
+
+func (cs *ChatService) CheckUserInConversation(userID, conversationID uint) bool {
+	return cs.chatRepo.CheckUserInConversation(userID, conversationID)
+}

@@ -74,7 +74,7 @@ func (sh *SocketHandler) HandleSocketRoute(ctx *gin.Context) {
 		return
 	}
 
-	// Get conversation ID and validate
+	// Get conversation ID and validate if it exists
 	conversationId := ctx.Query("conversationId")
 	if conversationId == "" {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
@@ -95,6 +95,15 @@ func (sh *SocketHandler) HandleSocketRoute(ctx *gin.Context) {
 	}
 	conversationIdUInt := uint(conversationIdInt)
 	if !sh.chatService.CheckConversationExists(conversationIdUInt) {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrInvalidConversationId},
+		})
+		return
+	}
+	// Check if user is part of the conversation
+	if !sh.chatService.CheckUserInConversation(userInfo.ID, conversationIdUInt) {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
 			Success: false,
 			Message: msgs.MsgOperationFailed,
@@ -132,6 +141,26 @@ func (sh *SocketHandler) HandleConnections(ctx *gin.Context, userInfo *models.Cl
 		}
 	}(ws)
 
+	// Handle disconnection
+	sh.handleDiconnectedClient(ws, userInfo.ID, conversationId)
+
+	// Add client to hub
+	sh.addConversationToHub(userInfo.ID, conversationId, ws)
+
+	// Handle incoming messages
+	sh.handleIncommingMessages(ws, userInfo, conversationId)
+}
+
+func (sh *SocketHandler) handleDiconnectedClient(ws *websocket.Conn, userId uint, conversationId uint) {
+	ws.SetCloseHandler(func(code int, text string) error {
+		sh.mu.Lock()
+		sh.deleteDiconnectedClientFromConversation(userId, conversationId)
+		sh.mu.Unlock()
+		return nil
+	})
+}
+
+func (sh *SocketHandler) addConversationToHub(userId uint, conversationId uint, ws *websocket.Conn) {
 	sh.mu.Lock()
 	// Add conversation to hub if not exists
 	if _, ok := sh.hub.Conversations[conversationId]; !ok {
@@ -143,22 +172,25 @@ func (sh *SocketHandler) HandleConnections(ctx *gin.Context, userInfo *models.Cl
 			append(sh.hub.Conversations[conversationId],
 				&models.SocketClient{
 					Conn:   ws,
-					UserId: userInfo.ID,
+					UserId: userId,
 				},
 			)
 	}
 	sh.mu.Unlock()
 
-	// For debugging purposes
-	sh.LogConversations()
+	// Log conversations for debug purposes
+	sh.logConversations()
+}
 
+func (sh *SocketHandler) handleIncommingMessages(ws *websocket.Conn, userInfo *models.Claims, conversationId uint) {
 	for {
+		// Read message from client
 		var messageRequest models.MessageRequest
 		err := ws.ReadJSON(&messageRequest)
 		if err != nil {
 			log.Printf("Error reading json: %v", err)
 			sh.mu.Lock()
-			delete(sh.hub.Conversations, conversationId)
+			sh.deleteDiconnectedClientFromConversation(userInfo.ID, conversationId)
 			sh.mu.Unlock()
 			break
 		}
@@ -187,12 +219,31 @@ func (sh *SocketHandler) HandleConnections(ctx *gin.Context, userInfo *models.Cl
 	}
 }
 
+func (sh *SocketHandler) deleteDiconnectedClientFromConversation(userId uint, conversationId uint) {
+	// Remove disconnected client from conversation
+	for i, client := range sh.hub.Conversations[conversationId] {
+		if client.UserId == userId {
+			sh.hub.Conversations[conversationId] = append(sh.hub.Conversations[conversationId][:i], sh.hub.Conversations[conversationId][i+1:]...)
+			break
+		}
+	}
+	// Check if the conversation is empty and remove it from the map
+	if len(sh.hub.Conversations[conversationId]) == 0 {
+		delete(sh.hub.Conversations, conversationId)
+	}
+	// Log conversations for debug purposes
+	sh.logConversations()
+}
 
-func (sh *SocketHandler) LogConversations() {
+func (sh *SocketHandler) logConversations() {
 	for conversationId, clients := range sh.hub.Conversations {
-		log.Printf("Conversation ID: %v, Clients: %v", conversationId, clients)
+		log.Printf("Conversation ID: %v", conversationId)
+		for _, client := range clients {
+			log.Printf("Client ID: %v, Connection: %v", client.UserId, client.Conn)
+		}
 	}
 }
+
 func (sh *SocketHandler) HandleRedisMessages() {
 	ch := sh.SubscribeToChannel(sh.hub.Redis, "chat_channel")
 	for msg := range ch {
@@ -209,9 +260,7 @@ func (sh *SocketHandler) HandleRedisMessages() {
 func (sh *SocketHandler) SendMessageToClient(message models.Message) {
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
-
 	if conversation, ok := sh.hub.Conversations[message.ConversationID]; ok {
-
 		for _, client := range conversation {
 			if err := client.Conn.WriteJSON(message); err != nil {
 				log.Printf("Error writing json: %v", err)
@@ -219,7 +268,7 @@ func (sh *SocketHandler) SendMessageToClient(message models.Message) {
 				if err != nil {
 					return
 				}
-				delete(sh.hub.Conversations, message.ConversationID)
+				sh.deleteDiconnectedClientFromConversation(client.UserId, message.ConversationID)
 			}
 		}
 	}

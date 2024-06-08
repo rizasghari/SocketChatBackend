@@ -131,3 +131,24 @@ func (ar *AuthenticationRepository) UpdateUserProfilePhoto(id uint, photo string
 	}
 	return nil
 }
+
+func (ar *AuthenticationRepository) UpdateUser(updateUserReq *models.UpdateUserRequest) (*models.UserResponse, []error) {
+	var errors []error
+	var user models.User
+	updates := map[string]interface{}{
+		"first_name": updateUserReq.FirstName,
+		"last_name":  updateUserReq.LastName,
+	}
+	result := ar.db.Model(&models.User{}).Where("id = ?", updateUserReq.ID).Updates(updates).First(&user, "id = ?", updateUserReq.ID)
+	if err := result.Error; err != nil {
+		errors = append(errors, err)
+		return nil, errors
+	}
+	if result.RowsAffected == 0 {
+		errors = append(errors, errs.ErrUserNotFound)
+		return nil, errors
+	}
+
+	userResponse := user.ToUserResponse()
+	return &userResponse, nil
+}

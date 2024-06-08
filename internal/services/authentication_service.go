@@ -117,3 +117,17 @@ func (as *AuthenticationService) UpdateUserProfilePhoto(id uint, photo string) [
 	}
 	return as.authRepo.UpdateUserProfilePhoto(id, photo)
 }
+
+func (as *AuthenticationService) UpdateUser(user *models.UpdateUserRequest) (*models.UserResponse, []error) {
+	var errors []error
+	if user.ID <= 0 {
+		errors = append(errors, errs.ErrInvalidParams)
+		return nil, errors
+	}
+
+	if user.FirstName == "" || user.LastName == "" {
+		errors = append(errors, errs.ErrInvalidParams)
+		return nil, errors
+	}
+	return as.authRepo.UpdateUser(user)
+}

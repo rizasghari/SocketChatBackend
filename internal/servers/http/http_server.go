@@ -69,6 +69,7 @@ func (hs *HttpServer) setupRestfulRoutes() {
 		authenticated.GET("/users", hs.handler.GetAllUsersWithPagination)
 		authenticated.GET("/users/:id", hs.handler.GetSingleUser)
 		authenticated.POST("/users/upload-profile-photo", hs.handler.UploadUserProfilePhoto)
+		authenticated.PUT("/users", hs.handler.UpdateUser)
 
 		authenticated.POST("/conversations", hs.handler.CreateConversation)
 		authenticated.GET("/conversations/user/:id", hs.handler.GetUserConversations)

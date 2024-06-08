@@ -441,3 +441,46 @@ func (rh *RestHandler) GetMessagesByConversationID(ctx *gin.Context) {
 		Data:    messages,
 	})
 }
+
+func (rh *RestHandler) UpdateUser(ctx *gin.Context) {
+	var errors []error 
+	var updateUserRequest models.UpdateUserRequest
+	if err := ctx.ShouldBindJSON(&updateUserRequest); err != nil {
+		errors = append(errors, errs.ErrInvalidRequest)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errors,
+		})
+		return
+	}
+
+	userID := utils.GetUserIdFromContext(ctx)
+	if userID < 1 {
+		errors = append(errors, errs.ErrUnauthorized)
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errors,
+		})
+		return
+	}
+
+	updateUserRequest.ID = uint(userID)
+
+	updatedUser, errs := rh.authService.UpdateUser(&updateUserRequest)
+	if len(errs) > 0 {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errs,
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, models.Response{
+		Success: true,
+		Message: msgs.MsgOperationSuccessful,
+		Data:    updatedUser,
+	})
+}

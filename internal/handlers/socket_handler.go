@@ -8,8 +8,11 @@ import (
 	"os"
 	"os/signal"
 	"slices"
+	"socketChat/internal/enums"
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
+	redisModels "socketChat/internal/models/redis"
+	socketModels "socketChat/internal/models/socket"
 	"socketChat/internal/msgs"
 	"socketChat/internal/services"
 	"socketChat/internal/utils"
@@ -148,14 +151,12 @@ func (sh *SocketHandler) HandleConnections(ctx *gin.Context, userInfo *models.Cl
 	sh.handleConversationAndClinet(userInfo.ID, conversationId, ws)
 
 	// Handle incoming messages
-	sh.handleIncommingMessages(ws, userInfo, conversationId)
+	sh.handleIncommingMessagesWithEvent(ws, userInfo, conversationId)
 }
 
 func (sh *SocketHandler) handleDiconnectedClient(ws *websocket.Conn, userId uint, conversationId uint) {
 	ws.SetCloseHandler(func(code int, text string) error {
-		sh.mu.Lock()
 		sh.deleteDiconnectedClientFromConversation(userId, conversationId)
-		sh.mu.Unlock()
 		return nil
 	})
 }
@@ -182,44 +183,116 @@ func (sh *SocketHandler) handleConversationAndClinet(userId uint, conversationId
 	sh.logConversations()
 }
 
-func (sh *SocketHandler) handleIncommingMessages(ws *websocket.Conn, userInfo *models.Claims, conversationId uint) {
+func (sh *SocketHandler) handleIncommingMessagesWithEvent(ws *websocket.Conn, userInfo *models.Claims, conversationId uint) {
 	for {
 		// Read message from client
-		var messageRequest models.MessageRequest
-		err := ws.ReadJSON(&messageRequest)
+		var event socketModels.SocketEvent
+		err := ws.ReadJSON(&event)
 		if err != nil {
 			log.Printf("Error reading json: %v", err)
-			sh.mu.Lock()
 			sh.deleteDiconnectedClientFromConversation(userInfo.ID, conversationId)
-			sh.mu.Unlock()
 			break
 		}
 
-		// Save message in DB
-		message := &models.Message{
-			ConversationID: messageRequest.ConversationID,
-			Content:        messageRequest.Content,
-			SenderID:       userInfo.ID,
-		}
-		savedMessage, saveMsgErrs := sh.chatService.SaveMessage(message)
-		if len(saveMsgErrs) > 0 {
-			log.Printf("Error saving message: %v", saveMsgErrs)
-			break
-		}
+		// Set event conversation id
+		event.ConversationID = conversationId
 
-		// Publish the new message to Redis
-		jsonMessage, err := json.Marshal(savedMessage)
-		if err != nil {
-			log.Printf("Error marshalling message: %v", err)
-			continue
-		}
-		if err := sh.PublishMessage(sh.hub.Redis, "chat_channel", jsonMessage); err != nil {
-			log.Printf("Error publishing message: %v", err)
+		// Handle event
+		switch event.Event {
+		case enums.SOCKET_EVENT_SEND_MESSAGE:
+			errs := sh.handleSendMessageEvent(event.Payload, enums.SOCKET_EVENT_SEND_MESSAGE, userInfo, conversationId)
+			if len(errs) > 0 {
+				log.Printf("handleIncommingMessagesWithEvent - Error while handling send message event: %v", errs)
+			}
+		case enums.SOCKET_EVENT_SEEN_MESSAGE:
+			errs := sh.handleSeenMessageEvent(event.Payload, enums.SOCKET_EVENT_SEEN_MESSAGE, conversationId, userInfo.ID)
+			if len(errs) > 0 {
+				log.Printf("handleIncommingMessagesWithEvent - Error while handling seen message event: %v", errs)
+			}
+		default:
+			log.Printf("Unknown event: %v", event)
 		}
 	}
 }
 
+func (sh *SocketHandler) handleSendMessageEvent(payload json.RawMessage, event string, userInfo *models.Claims, conversationId uint) []error {
+	var errors []error
+	var messageRequest models.MessageRequest
+	err := json.Unmarshal(payload, &messageRequest)
+	if err != nil {
+		errors = append(errors, errs.ErrInvalidRequest)
+		sh.deleteDiconnectedClientFromConversation(userInfo.ID, conversationId)
+		return errors
+	}
+
+	// Save message in DB
+	message := &models.Message{
+		ConversationID: conversationId,
+		Content:        messageRequest.Content,
+		SenderID:       userInfo.ID,
+	}
+	savedMessage, saveMsgErrs := sh.chatService.SaveMessage(message)
+	if len(saveMsgErrs) > 0 {
+		errors = append(errors, saveMsgErrs...)
+		return errors
+	}
+
+	redisEvent := redisModels.RedisPublishedMessage{
+		Event:          event,
+		ConversationID: conversationId,
+		Payload:        savedMessage,
+	}
+
+	// Publish the new message to Redis
+	jsonEvent, err := json.Marshal(redisEvent)
+	if err != nil {
+		errors = append(errors, err)
+		return errors
+	}
+	if err := sh.PublishMessage(sh.hub.Redis, "chat_channel", jsonEvent); err != nil {
+		errors = append(errors, err)
+		return errors
+	}
+	return nil
+}
+
+func (sh *SocketHandler) handleSeenMessageEvent(payload json.RawMessage, event string, conversationId, seenerId uint) []error {
+	var errors []error
+	var seenData socketModels.SeenMessagePayload
+	err := json.Unmarshal(payload, &seenData)
+	if err != nil {
+		errors = append(errors, err)
+		return errors
+	}
+	// Mark message as seen in DB
+	errs := sh.chatService.SeenMessage(seenData.MessageId, seenerId)
+	if len(errs) > 0 {
+		errors = append(errors, errs...)
+		return errors
+	}
+	// Publish the new message to Redis
+	redisEvent := redisModels.RedisPublishedMessage{
+		Event:          event,
+		ConversationID: conversationId,
+		Payload:        seenData,
+	}
+
+	// Publish the new message to Redis
+	jsonEvent, err := json.Marshal(redisEvent)
+	if err != nil {
+		errors = append(errors, err)
+		return errors
+	}
+	if err := sh.PublishMessage(sh.hub.Redis, "chat_channel", jsonEvent); err != nil {
+		errors = append(errors, err)
+		return errors
+	}
+	return nil
+}
+
 func (sh *SocketHandler) deleteDiconnectedClientFromConversation(userId uint, conversationId uint) {
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
 	// Remove disconnected client from conversation
 	for i, client := range sh.hub.Conversations[conversationId] {
 		if client.UserId == userId {
@@ -247,28 +320,27 @@ func (sh *SocketHandler) logConversations() {
 func (sh *SocketHandler) HandleRedisMessages() {
 	ch := sh.SubscribeToChannel(sh.hub.Redis, "chat_channel")
 	for msg := range ch {
-		var message models.Message
-		if err := json.Unmarshal([]byte(msg.Payload), &message); err != nil {
+		var redisMessage redisModels.RedisPublishedMessage
+		if err := json.Unmarshal([]byte(msg.Payload), &redisMessage); err != nil {
 			log.Printf("Error unmarshalling message: %v", err)
 			continue
 		}
-		// Send the message to the intended recipient
-		sh.SendMessageToClient(message)
+		sh.SendMessageToClient(redisMessage)
 	}
 }
 
-func (sh *SocketHandler) SendMessageToClient(message models.Message) {
+func (sh *SocketHandler) SendMessageToClient(redisMessage redisModels.RedisPublishedMessage) {
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
-	if conversation, ok := sh.hub.Conversations[message.ConversationID]; ok {
+	if conversation, ok := sh.hub.Conversations[redisMessage.ConversationID]; ok {
 		for _, client := range conversation {
-			if err := client.Conn.WriteJSON(message); err != nil {
+			if err := client.Conn.WriteJSON(redisMessage); err != nil {
 				log.Printf("Error writing json: %v", err)
 				err := client.Conn.Close()
 				if err != nil {
 					return
 				}
-				sh.deleteDiconnectedClientFromConversation(client.UserId, message.ConversationID)
+				sh.deleteDiconnectedClientFromConversation(client.UserId, redisMessage.ConversationID)
 			}
 		}
 	}

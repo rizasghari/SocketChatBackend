@@ -55,7 +55,7 @@ func (rh *RestHandler) Login(ctx *gin.Context) {
 	}
 
 	loginResponse, loginErrs := rh.authService.Login(&loginData)
-	if loginErrs != nil && len(loginErrs) > 0 {
+	if len(loginErrs) > 0 {
 		errors = append(errors, loginErrs...)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
 			Success: false,

@@ -3,6 +3,7 @@ package services
 import (
 	"socketChat/internal/models"
 	"socketChat/internal/repositories"
+	"socketChat/internal/errs"
 )
 
 type ChatService struct {
@@ -38,4 +39,12 @@ func (cs *ChatService) CheckConversationExists(conversationID uint) bool {
 
 func (cs *ChatService) CheckUserInConversation(userID, conversationID uint) bool {
 	return cs.chatRepo.CheckUserInConversation(userID, conversationID)
+}
+
+func (cs *ChatService) SeenMessage(messageId, seenerId uint) []error {
+	// Validate message id
+	if messageId <= 0 {
+		return []error{errs.ErrMessageNotFound}
+	}
+	return cs.chatRepo.SeenMessage(messageId, seenerId)
 }

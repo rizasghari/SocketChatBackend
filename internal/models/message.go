@@ -1,6 +1,10 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 type Message struct {
 	gorm.Model
@@ -8,4 +12,5 @@ type Message struct {
 	Conversation   Conversation `json:"-"`
 	SenderID       uint         `json:"sender_id"`
 	Content        string       `gorm:"not null" json:"content"`
+	SeenAt         *time.Time   `json:"seen_at"`
 }

@@ -22,6 +22,8 @@ const (
 	ErrUnableToUploadFile       = Error("unable to upload file")
 	ErrUnableToUpdateProfilePhoto = Error("unable to update profile photo")
 
+	ErrMessageNotFound = Error("message not found")
+
 	ErrInvalidRequestBody = Error("invalid request body")
 	ErrUserAlreadyExists  = Error("user already exists")
 	ErrUserNotFound       = Error("user not found")

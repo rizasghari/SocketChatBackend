@@ -3,6 +3,8 @@ package repositories
 import (
 	"socketChat/internal/models"
 	"socketChat/internal/utils"
+	"socketChat/internal/errs"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -153,4 +155,19 @@ func (chr *ChatRepository) CheckUserInConversation(userID, conversationID uint) 
 	var count int64
 	chr.db.Model(&models.ConversationMember{}).Where("user_id = ? AND conversation_id = ?", userID, conversationID).Count(&count)
 	return count > 0
+}
+
+func (chr *ChatRepository) SeenMessage(messageId, seenerId uint) []error {
+	var errors []error
+	// Update if not seen yet and sender is not the seener to prevent message owner from marking it as seen
+	result := chr.db.Model(&models.Message{}).Where("id = ? AND seen_at IS NULL AND sender_id != ?", messageId, seenerId).Update("seen_at", time.Now())
+	if err := result.Error; err != nil {
+		errors = append(errors, err)
+		return errors
+	}
+	if result.RowsAffected == 0 {
+		errors = append(errors, errs.ErrMessageNotFound)
+		return errors
+	}
+	return nil
 }

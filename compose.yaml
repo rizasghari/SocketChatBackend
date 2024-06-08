@@ -59,10 +59,10 @@ services:
     command: server /data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
+      interval: 10s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 10s
     volumes:
       - socket-chat-minio-data:/data
 

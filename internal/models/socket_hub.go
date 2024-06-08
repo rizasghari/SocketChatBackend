@@ -6,7 +6,8 @@ import (
 )
 
 type SocketHub struct {
-	Clients map[uint]*SocketClient
-	Mu      sync.Mutex
-	Redis   *redis.Client
+	// [conversation_id] => []*SocketClient
+	Conversations map[uint][]*SocketClient
+	Mu            sync.Mutex
+	Redis         *redis.Client
 }

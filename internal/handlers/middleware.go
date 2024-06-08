@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (h *Handler) MustAuthenticateMiddleware() gin.HandlerFunc {
+func (rh *RestHandler) MustAuthenticateMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		jwtTokenFromHeader := ctx.GetHeader("Authorization")
 		if jwtTokenFromHeader != "" {

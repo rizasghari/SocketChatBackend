@@ -24,10 +24,14 @@ func (cs *ChatService) GetUserConversations(userID uint, page, size int) (*model
 	return cs.chatRepo.GetUserConversations(userID, page, size)
 }
 
-func (cs *ChatService) SendMessage(message *models.Message) (*models.Message, []error) {
-	return cs.chatRepo.SendMessage(message)
+func (cs *ChatService) SaveMessage(message *models.Message) (*models.Message, []error) {
+	return cs.chatRepo.SaveMessage(message)
 }
 
 func (cs *ChatService) GetMessagesByConversationId(conversationID uint, page, size int) (*models.MessageListResponse, []error) {
 	return cs.chatRepo.GetMessagesByConversationId(conversationID, page, size)
+}
+
+func (cs *ChatService) CheckConversationExists(conversationID uint) bool {
+	return cs.chatRepo.CheckConversationExists(conversationID)
 }

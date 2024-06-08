@@ -18,19 +18,19 @@ var (
 
 type HttpServer struct {
 	router  *gin.Engine
-	handler *handlers.Handler
-	socket  *handlers.Socket
+	handler *handlers.RestHandler
+	socket  *handlers.SocketHandler
 	redis   *redis.Client
 	ctx     context.Context
 }
 
-func NewHttpServer(ctx context.Context, redis *redis.Client, handler *handlers.Handler) *HttpServer {
+func NewHttpServer(ctx context.Context, redis *redis.Client, handler *handlers.RestHandler, socket *handlers.SocketHandler) *HttpServer {
 	once.Do(func() {
 		httpServer = &HttpServer{
 			handler: handler,
 			redis:   redis,
 			ctx:     ctx,
-			socket:  handlers.NewSocket(redis, ctx),
+			socket:  socket,
 		}
 	})
 	return httpServer
@@ -74,7 +74,7 @@ func (hs *HttpServer) setupRestfulRoutes() {
 		authenticated.GET("/conversations/user/:id", hs.handler.GetUserConversations)
 		authenticated.GET("/conversations/my", hs.handler.GetUserConversationsByToken)
 
-		authenticated.POST("/messages", hs.handler.SendMessage)
+		authenticated.POST("/messages", hs.handler.SaveMessage)
 		authenticated.GET("/messages/conversation/:id", hs.handler.GetMessagesByConversationID)
 	}
 }

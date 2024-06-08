@@ -97,7 +97,7 @@ func (chr *ChatRepository) GetUserConversations(userID uint, page, size int) (*m
 	}, nil
 }
 
-func (chr *ChatRepository) SendMessage(message *models.Message) (*models.Message, []error) {
+func (chr *ChatRepository) SaveMessage(message *models.Message) (*models.Message, []error) {
 	var errors []error
 	if err := chr.db.Create(message).Error; err != nil {
 		errors = append(errors, err)
@@ -141,4 +141,10 @@ func (chr *ChatRepository) GetMessagesByConversationId(conversationID uint, page
 		Size:     size,
 		Total:    total,
 	}, nil
+}
+
+func (chr *ChatRepository) CheckConversationExists(conversationID uint) bool {
+	var count int64
+	chr.db.Model(&models.Conversation{}).Where("id = ?", conversationID).Count(&count)
+	return count > 0
 }

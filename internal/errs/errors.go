@@ -15,6 +15,7 @@ const (
 	ErrUnauthorized = Error("unauthorized")
 
 	ErrConversationCreationFailed = Error("conversation creation failed")
+	ErrInvalidConversationId      = Error("invalid conversation id")
 
 	ErrNoFileUploaded           = Error("no file uploaded")
 	ErrUnableToOpenUploadedFile = Error("unable to open uploaded file")

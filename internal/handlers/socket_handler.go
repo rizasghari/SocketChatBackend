@@ -239,7 +239,7 @@ func (sh *SocketHandler) logConversations() {
 	for conversationId, clients := range sh.hub.Conversations {
 		log.Printf("Conversation ID: %v", conversationId)
 		for _, client := range clients {
-			log.Printf("Client ID: %v, Connection: %v", client.UserId, client.Conn)
+			log.Printf("Client ID: %v", client.UserId)
 		}
 	}
 }

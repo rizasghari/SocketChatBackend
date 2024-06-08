@@ -145,7 +145,7 @@ func (sh *SocketHandler) HandleConnections(ctx *gin.Context, userInfo *models.Cl
 	sh.handleDiconnectedClient(ws, userInfo.ID, conversationId)
 
 	// Add client to hub
-	sh.addConversationToHub(userInfo.ID, conversationId, ws)
+	sh.handleConversationAndClinet(userInfo.ID, conversationId, ws)
 
 	// Handle incoming messages
 	sh.handleIncommingMessages(ws, userInfo, conversationId)
@@ -160,7 +160,7 @@ func (sh *SocketHandler) handleDiconnectedClient(ws *websocket.Conn, userId uint
 	})
 }
 
-func (sh *SocketHandler) addConversationToHub(userId uint, conversationId uint, ws *websocket.Conn) {
+func (sh *SocketHandler) handleConversationAndClinet(userId uint, conversationId uint, ws *websocket.Conn) {
 	sh.mu.Lock()
 	// Add conversation to hub if not exists
 	if _, ok := sh.hub.Conversations[conversationId]; !ok {

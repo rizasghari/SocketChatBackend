@@ -15,3 +15,4 @@ This project is a scalable and performant web application built with Golang. It 
 - **MinIO**: High-performance object storage.
 - **Redis**: In-memory data structure store, used as a database, cache, and message broker.
 - **Docker Compose**: Tool for defining and running multi-container Docker applications.
+- **Swagger Dpcumentation**: Documentes all rest APIs.

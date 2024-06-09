@@ -12,7 +12,7 @@ type Conversation struct {
 }
 
 func (conversation *Conversation) ToConversationResponse() ConversationResponse {
-	members := []UserResponse{}
+	members := []*UserResponse{}
 	for _, member := range conversation.Members {
 		members = append(members, member.ToUserResponse())
 	}

@@ -60,7 +60,7 @@ func (ar *AuthenticationRepository) Login(login *models.LoginRequestBody) (*mode
 
 func (ar *AuthenticationRepository) GetAllUsersWithPagination(page, size int) (*models.GetUsersResponse, []error) {
 	var users []models.User
-	var userResponses []models.UserResponse
+	var userResponses []*models.UserResponse
 	var errors []error
 	var total int64
 
@@ -114,8 +114,7 @@ func (ar *AuthenticationRepository) GetSingleUser(id int) (*models.UserResponse,
 		errors = append(errors, errs.ErrUserNotFound)
 		return nil, errors
 	}
-	userResponse := user.ToUserResponse()
-	return &userResponse, nil
+	return user.ToUserResponse(), nil
 }
 
 func (ar *AuthenticationRepository) UpdateUserProfilePhoto(id uint, photo string) []error {
@@ -149,6 +148,5 @@ func (ar *AuthenticationRepository) UpdateUser(updateUserReq *models.UpdateUserR
 		return nil, errors
 	}
 
-	userResponse := user.ToUserResponse()
-	return &userResponse, nil
+	return user.ToUserResponse(), nil
 }

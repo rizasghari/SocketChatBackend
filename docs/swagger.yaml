@@ -1,0 +1,74 @@
+basePath: /api/v1
+definitions:
+  models.Response:
+    properties:
+      data: {}
+      errors:
+        items: {}
+        type: array
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+externalDocs:
+  description: Github
+  url: https://github.com/rizasghari
+host: localhost:8080
+info:
+  contact:
+    email: developer.rizasghari@gmail.com
+    name: Riza Asghari
+    url: https://github.com/rizasghari
+  description: A web socket based chat application.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: https://github.com/rizasghari
+  title: Socket Chat API Documentation
+  version: "1.0"
+paths:
+  /:
+    get:
+      description: Get home page html
+      produces:
+      - text/html
+      responses: {}
+      summary: Show home page
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: get string by ID
+      parameters:
+      - description: Account ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: Login user to account
+      tags:
+      - accounts
+securityDefinitions:
+  JWT:
+    type: basic
+swagger: "2.0"

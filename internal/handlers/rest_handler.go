@@ -34,10 +34,27 @@ func NewRestandler(
 	}
 }
 
+// Index godoc
+// @Summary      Show home page
+// @Description  Get home page html
+// @Produce      html
+// @Router       / [get]
 func (rh *RestHandler) Index(ctx *gin.Context) {
 	ctx.HTML(http.StatusOK, "index.html", nil)
 }
 
+// Login godoc
+// @Summary      Login user to account
+// @Description  get string by ID
+// @Tags         accounts
+// @Accept       json
+// @Produce      json
+// @Param        id   path      int  true  "Account ID"
+// @Success      200  {object}  models.Response
+// @Failure      400  {object}  models.Response
+// @Failure      404  {object}  models.Response
+// @Failure      500  {object}  models.Response
+// @Router       /login [post]
 func (rh *RestHandler) Login(ctx *gin.Context) {
 	var errors []error
 

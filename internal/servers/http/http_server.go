@@ -5,6 +5,8 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
+	"github.com/swaggo/files"      
+	"github.com/swaggo/gin-swagger"
 	"log"
 	"net/http"
 	"socketChat/internal/handlers"
@@ -51,10 +53,12 @@ func (hs *HttpServer) initializeGin() {
 	hs.router.LoadHTMLGlob("./*.html")
 }
 
+
 func (hs *HttpServer) setupRestfulRoutes() {
 	web := hs.router.Group("/")
 	{
 		web.GET("/", hs.handler.Index)
+		web.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
 	v1 := hs.router.Group("/api/v1")

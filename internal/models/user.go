@@ -18,8 +18,8 @@ type User struct {
 	LastSeen     *time.Time `json:"last_seen"`
 }
 
-func (user *User) ToUserResponse() UserResponse {
-	return UserResponse{
+func (user *User) ToUserResponse() *UserResponse {
+	return &UserResponse{
 		ID:           user.ID,
 		FirstName:    user.FirstName,
 		LastName:     user.LastName,

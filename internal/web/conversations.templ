@@ -1,0 +1,35 @@
+package web
+
+import(
+    "socketChat/internal/models"
+)
+
+templ Conversations(conversations []models.ConversationResponse, otherUsers []models.User) {
+	<div class="conversations-page">
+		<h2>Conversations</h2>
+		<ul id="conversations-list" class="list-group mb-3">
+			for _, conversation := range conversations {
+				<li class="list-group-item d-flex align-items-center">
+					<img src="{conversation.Members[0].ProfilePhoto}" class="rounded-circle mr-3" alt="User Profile Photo" width="50" height="50"/>
+					<div>
+						<h5 class="mb-1">{ conversation.Name }</h5>
+						<small>Last message...</small>
+					</div>
+				</li>
+			}
+		</ul>
+		<h2>Start a New Chat</h2>
+		<ul id="users-list" class="list-group">
+			for _, user := range otherUsers {
+				<li class="list-group-item d-flex align-items-center">
+					<img src="{user.ProfilePhoto}" class="rounded-circle mr-3" alt="User Profile Photo" width="50" height="50"/>
+					<div class="flex-grow-1">
+						<h5 class="mb-1">{ user.FirstName }</h5>
+					</div>
+					<button class="btn btn-primary ml-auto" hx-post="/start-chat" hx-vals='{"userId": "{.ID}"}' hx-target="#conversations-list" hx-swap="outerHTML">Start Chat</button>
+				</li>
+			}
+		</ul>
+		<button hx-get="/logout" hx-target="#app" hx-swap="outerHTML" class="btn btn-secondary mt-3">Logout</button>
+	</div>
+}

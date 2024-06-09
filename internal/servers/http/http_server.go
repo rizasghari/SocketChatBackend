@@ -5,7 +5,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
-	"github.com/swaggo/files"      
+	"github.com/swaggo/files"
 	"github.com/swaggo/gin-swagger"
 	"log"
 	"net/http"
@@ -19,20 +19,28 @@ var (
 )
 
 type HttpServer struct {
-	router  *gin.Engine
-	handler *handlers.RestHandler
-	socket  *handlers.SocketHandler
-	redis   *redis.Client
-	ctx     context.Context
+	router        *gin.Engine
+	restHandler   *handlers.RestHandler
+	htmlHandler   *handlers.HtmlHandler
+	socketHandler *handlers.SocketHandler
+	redis         *redis.Client
+	ctx           context.Context
 }
 
-func NewHttpServer(ctx context.Context, redis *redis.Client, handler *handlers.RestHandler, socket *handlers.SocketHandler) *HttpServer {
+func NewHttpServer(
+	ctx context.Context,
+	redis *redis.Client,
+	restHandler *handlers.RestHandler,
+	socketHandler *handlers.SocketHandler,
+	htmlHandler *handlers.HtmlHandler,
+) *HttpServer {
 	once.Do(func() {
 		httpServer = &HttpServer{
-			handler: handler,
-			redis:   redis,
-			ctx:     ctx,
-			socket:  socket,
+			restHandler:   restHandler,
+			redis:         redis,
+			ctx:           ctx,
+			socketHandler: socketHandler,
+			htmlHandler:   htmlHandler,
 		}
 	})
 	return httpServer
@@ -42,50 +50,60 @@ func (hs *HttpServer) Run() {
 	hs.initializeGin()
 	hs.setupWebSocketRoutes()
 	hs.setupRestfulRoutes()
-	hs.socket.StartSocket()
+	hs.socketHandler.StartSocket()
 	server := hs.startServer()
 	// Wait for interrupt signal to gracefully shut down the server
-	hs.socket.WaitForShutdown(server)
+	hs.socketHandler.WaitForShutdown(server)
 }
 
 func (hs *HttpServer) initializeGin() {
 	hs.router = gin.Default()
-	hs.router.LoadHTMLGlob("./*.html")
+
+	hs.router.Static("/web/static", "./web/static")
+
+	ginHtmlRenderer := hs.router.HTMLRender
+	hs.router.HTMLRender = &handlers.HTMLTemplRenderer{FallbackHtmlRenderer: ginHtmlRenderer}
+
+	// Disable trusted proxy warning.
+	err := hs.router.SetTrustedProxies(nil)
+	if err != nil {
+		return
+	}
 }
 
-
 func (hs *HttpServer) setupRestfulRoutes() {
+	hs.router.NoRoute(hs.htmlHandler.NotFound)
 	web := hs.router.Group("/")
 	{
-		web.GET("/", hs.handler.Index)
+		web.GET("/", hs.htmlHandler.Index)
 		web.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
 	v1 := hs.router.Group("/api/v1")
 	{
-		v1.POST("/login", hs.handler.Login)
-		v1.POST("/register", hs.handler.Register)
+		v1.POST("/login", hs.restHandler.Login)
+		v1.POST("/register", hs.restHandler.Register)
 	}
 
 	authenticated := v1.Group("/")
-	authenticated.Use(hs.handler.MustAuthenticateMiddleware())
+	authenticated.Use(handlers.MustAuthenticateMiddleware())
 	{
-		authenticated.GET("/users", hs.handler.GetAllUsersWithPagination)
-		authenticated.GET("/users/:id", hs.handler.GetSingleUser)
-		authenticated.POST("/users/upload-profile-photo", hs.handler.UploadUserProfilePhoto)
-		authenticated.PUT("/users", hs.handler.UpdateUser)
+		authenticated.GET("/users", hs.restHandler.GetAllUsersWithPagination)
+		authenticated.GET("/users/:id", hs.restHandler.GetSingleUser)
+		authenticated.POST("/users/upload-profile-photo", hs.restHandler.UploadUserProfilePhoto)
+		authenticated.PUT("/users", hs.restHandler.UpdateUser)
 
-		authenticated.POST("/conversations", hs.handler.CreateConversation)
-		authenticated.GET("/conversations/user/:id", hs.handler.GetUserConversations)
-		authenticated.GET("/conversations/my", hs.handler.GetUserConversationsByToken)
+		authenticated.POST("/conversations", hs.restHandler.CreateConversation)
+		authenticated.GET("/conversations/user/:id", hs.restHandler.GetUserConversations)
+		authenticated.GET("/conversations/my", hs.restHandler.GetUserConversationsByToken)
 
-		authenticated.POST("/messages", hs.handler.SaveMessage)
-		authenticated.GET("/messages/conversation/:id", hs.handler.GetMessagesByConversationID)
+		authenticated.POST("/messages", hs.restHandler.SaveMessage)
+		authenticated.GET("/messages/conversation/:id", hs.restHandler.GetMessagesByConversationID)
 	}
 }
 
 func (hs *HttpServer) setupWebSocketRoutes() {
-	hs.router.GET("/ws", hs.socket.HandleSocketRoute)
+	hs.router.GET("/ws", hs.socketHandler.HandleSocketRoute)
 }
 
 func (hs *HttpServer) startServer() *http.Server {

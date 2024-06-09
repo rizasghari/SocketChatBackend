@@ -44,10 +44,11 @@ func (app *App) LetsGo() {
 	minioService := services.NewMinioService(app.configs)
 	fileManagerService := services.NewFileManagerService(minioService)
 
-	rest_handler := handlers.NewRestandler(authService, chatService, fileManagerService)
-	socket_handler := handlers.NewSocketHandler(app.redis, app.ctx, chatService)
+	restHandler := handlers.NewRestandler(authService, chatService, fileManagerService)
+	socketHandler := handlers.NewSocketHandler(app.redis, app.ctx, chatService)
+	htmlHandler := handlers.NewHtmlHandler(authService, chatService, fileManagerService)
 
-	http.NewHttpServer(app.ctx, app.redis, rest_handler, socket_handler).Run()
+	http.NewHttpServer(app.ctx, app.redis, restHandler, socketHandler, htmlHandler).Run()
 }
 
 func (app *App) initializeRedis() {

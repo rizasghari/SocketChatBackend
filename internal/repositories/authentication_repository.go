@@ -42,19 +42,20 @@ func (ar *AuthenticationRepository) CheckIfUserExists(email string) *models.User
 	return nil
 }
 
-func (ar *AuthenticationRepository) Login(login *models.LoginRequestBody) (*models.User, []error) {
+func (ar *AuthenticationRepository) Login(login *models.LoginRequestBody) (*models.UserResponse, string, []error) {
 	var errors []error
 	var user *models.User = ar.CheckIfUserExists(login.Email)
 	if user == nil {
 		errors = append(errors, errs.ErrUserNotFound)
-		return nil, errors
+		return nil, "", errors
 	}
 	log.Printf("Password: %v Hash: %v", login.Password, user.PasswordHash)
 	if err := utils.CompareHashAndPassword(user.PasswordHash, login.Password); err != nil {
 		errors = append(errors, errs.ErrWrongPassword)
-		return nil, errors
+		return nil, "", errors
 	}
-	return user, nil
+	
+	return user.ToUserResponse(), user.Email, nil
 }
 
 func (ar *AuthenticationRepository) GetAllUsersWithPagination(page, size int) (*models.GetUsersResponse, []error) {

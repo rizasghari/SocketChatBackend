@@ -48,7 +48,7 @@ func (as *AuthenticationService) Register(user *models.User) (*models.User, []er
 func (as *AuthenticationService) Login(loginData *models.LoginRequestBody) (*models.LoginResponse, []error) {
 	var errors []error
 
-	user, err := as.authRepo.Login(loginData)
+	user, email, err := as.authRepo.Login(loginData)
 	if err != nil {
 		errors = append(errors, err...)
 		return nil, errors
@@ -57,7 +57,7 @@ func (as *AuthenticationService) Login(loginData *models.LoginRequestBody) (*mod
 	jwtExpiration := time.Now().Add(time.Duration(as.config.Viper.GetInt("jwt.expiration_time")) * time.Hour).Unix()
 	token, jwtErr := utils.CreateJwtToken(
 		user.ID,
-		user.Email,
+		email,
 		user.FirstName,
 		user.LastName,
 		time.Unix(jwtExpiration, 0),

@@ -72,7 +72,12 @@ func (hs *HttpServer) initializeGin() {
 }
 
 func (hs *HttpServer) setupRestfulRoutes() {
+	// Handle no route found
 	hs.router.NoRoute(hs.htmlHandler.NotFound)
+
+	// Apply the CORS middleware to the router
+    hs.router.Use(handlers.CORSMiddleware())
+
 	web := hs.router.Group("/")
 	{
 		web.GET("/", hs.htmlHandler.Index)
@@ -92,6 +97,7 @@ func (hs *HttpServer) setupRestfulRoutes() {
 		authenticated.GET("/users/:id", hs.restHandler.GetSingleUser)
 		authenticated.POST("/users/upload-profile-photo", hs.restHandler.UploadUserProfilePhoto)
 		authenticated.PUT("/users", hs.restHandler.UpdateUser)
+		authenticated.GET("/users/dicover", hs.restHandler.DiscoverUsers)
 
 		authenticated.POST("/conversations", hs.restHandler.CreateConversation)
 		authenticated.GET("/conversations/user/:id", hs.restHandler.GetUserConversations)

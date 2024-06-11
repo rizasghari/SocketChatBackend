@@ -44,8 +44,7 @@ func (ar *AuthenticationRepository) CheckIfUserExists(email string) *models.User
 
 func (ar *AuthenticationRepository) Login(login *models.LoginRequestBody) (*models.User, []error) {
 	var errors []error
-	var user *models.User
-	user = ar.CheckIfUserExists(login.Email)
+	var user *models.User = ar.CheckIfUserExists(login.Email)
 	if user == nil {
 		errors = append(errors, errs.ErrUserNotFound)
 		return nil, errors
@@ -149,4 +148,49 @@ func (ar *AuthenticationRepository) UpdateUser(updateUserReq *models.UpdateUserR
 	}
 
 	return user.ToUserResponse(), nil
+}
+
+func (ar *AuthenticationRepository) GetNotContactedYetUsers(userID uint, page, size int) (*models.GetUsersResponse, []error) {
+	var errors []error
+	var userResponses []*models.UserResponse
+	var users []models.User
+
+	// Find users that have a conversation with the logged in user
+	subQuery := ar.db.Table("conversation_members").
+		Select("user_id").
+		Where("conversation_id IN (?)",
+			ar.db.Table("conversation_members").
+				Select("conversation_id").
+				Where("user_id = ?", userID),
+		)
+
+	// Find users that have not been contacted yet
+	result := ar.db.Table("users").
+		Scopes(utils.Paginate(page, size)).
+		Where("id NOT IN (?)", subQuery).
+		Find(&users)
+
+	if err := result.Error; err != nil {
+		errors = append(errors, err)
+		return nil, errors
+	}
+
+	if len(users) == 0 {
+		errors = append(errors, errs.ErrThereIsNoUser)
+		return nil, errors
+	}
+
+	for _, user := range users {
+		userResponses = append(userResponses, user.ToUserResponse())
+	}
+
+	usersResponse := &models.GetUsersResponse{
+		Users: userResponses,
+		Page:  page,
+		Size:  size,
+		Total: int64(len(users)),
+	}
+
+	return usersResponse, nil
+
 }

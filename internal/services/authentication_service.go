@@ -130,3 +130,12 @@ func (as *AuthenticationService) UpdateUser(user *models.UpdateUserRequest) (*mo
 	}
 	return as.authRepo.UpdateUser(user)
 }
+
+func (as *AuthenticationService) GetNotContactedYetUsers(userID uint, page, size int) (*models.GetUsersResponse, []error) {
+	var errors []error
+	if page < 0 || size < 0 {
+		errors = append(errors, errs.ErrInvalidPageOrSize)
+		return nil, errors
+	}
+	return as.authRepo.GetNotContactedYetUsers(userID, page, size)
+}

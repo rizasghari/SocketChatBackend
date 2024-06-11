@@ -88,6 +88,7 @@ func (rh *RestHandler) Login(ctx *gin.Context) {
 		Message: msgs.MsgOperationSuccessful,
 		Data:    loginResponse,
 	})
+
 }
 
 func (rh *RestHandler) Register(ctx *gin.Context) {

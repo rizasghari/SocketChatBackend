@@ -57,7 +57,7 @@ func (sh *SocketHandler) HandleSocketRoute(ctx *gin.Context) {
 		return
 	}
 
-	userInfo, err := utils.VerifyToken(jwtToken, utils.GetJwtKey())
+	userInfo, err := utils.VerifyToken(jwtToken)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
 			Success: false,

@@ -32,7 +32,7 @@ func GenerateSecretKey() string {
 	return base64.StdEncoding.EncodeToString(key)
 }
 
-func CreateJwtToken(id uint, email, firstName, lastName string, secretKey []byte, expiration time.Time) (string, error) {
+func CreateJwtToken(id uint, email, firstName, lastName string, expiration time.Time) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
 		models.Claims{
 			ID:        id,
@@ -44,7 +44,7 @@ func CreateJwtToken(id uint, email, firstName, lastName string, secretKey []byte
 			},
 		})
 
-	tokenString, err := token.SignedString(secretKey)
+	tokenString, err := token.SignedString(GetJwtKey())
 	if err != nil {
 		return "", err
 	}
@@ -52,10 +52,10 @@ func CreateJwtToken(id uint, email, firstName, lastName string, secretKey []byte
 	return tokenString, nil
 }
 
-func VerifyToken(tokenString string, secretKey []byte) (*models.Claims, error) {
+func VerifyToken(tokenString string) (*models.Claims, error) {
 	claims := &models.Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		return secretKey, nil
+		return GetJwtKey(), nil
 	})
 
 	if err != nil {
@@ -74,7 +74,7 @@ func IsAuthenticated(ctx *gin.Context, jwtKey []byte) bool {
 	if err != nil {
 		return false
 	}
-	if _, err = VerifyToken(jwtToken, jwtKey); err != nil {
+	if _, err = VerifyToken(jwtToken); err != nil {
 		return false
 	}
 

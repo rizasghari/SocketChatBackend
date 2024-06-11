@@ -60,7 +60,6 @@ func (as *AuthenticationService) Login(loginData *models.LoginRequestBody) (*mod
 		user.Email,
 		user.FirstName,
 		user.LastName,
-		utils.GetJwtKey(),
 		time.Unix(jwtExpiration, 0),
 	)
 	if jwtErr != nil {

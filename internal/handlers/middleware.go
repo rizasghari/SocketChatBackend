@@ -31,7 +31,7 @@ func MustAuthenticateMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		claims, err := utils.VerifyToken(jwtTokenFromHeader, utils.GetJwtKey())
+		claims, err := utils.VerifyToken(jwtTokenFromHeader)
 		if err != nil {
 			log.Println("JWT token verification failed:", err)
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{

@@ -139,3 +139,12 @@ func (as *AuthenticationService) GetNotContactedYetUsers(userID uint, page, size
 	}
 	return as.authRepo.GetNotContactedYetUsers(userID, page, size)
 }
+
+func (as *AuthenticationService) GetUserProfile(userID uint) (*models.ProfileResponse, []error) {
+	var errors []error
+	if userID <= 0 {
+		errors = append(errors, errs.ErrInvalidParams)
+		return nil, errors
+	}
+	return as.authRepo.GetUserProfile(int(userID))
+}

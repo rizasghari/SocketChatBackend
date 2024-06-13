@@ -28,3 +28,13 @@ func (user *User) ToUserResponse() *UserResponse {
 		LastSeen:     user.LastSeen,
 	}
 }
+
+func (user *User) ToProfileResponse() *ProfileResponse {
+	return &ProfileResponse{
+		ID:           user.ID,
+		Email:        user.Email,
+		FirstName:    user.FirstName,
+		LastName:     user.LastName,
+		ProfilePhoto: user.ProfilePhoto,
+	}
+}

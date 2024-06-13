@@ -195,3 +195,18 @@ func (ar *AuthenticationRepository) GetNotContactedYetUsers(userID uint, page, s
 	return usersResponse, nil
 
 }
+
+func (ar *AuthenticationRepository) GetUserProfile(id int) (*models.ProfileResponse, []error) {
+	var errors []error
+	var user models.User
+	result := ar.db.Where("id = ? AND deleted_at IS NULL", id).First(&user)
+	if err := result.Error; err != nil {
+		errors = append(errors, err)
+		return nil, errors
+	}
+	if result.RowsAffected == 0 {
+		errors = append(errors, errs.ErrUserNotFound)
+		return nil, errors
+	}
+	return user.ToProfileResponse(), nil
+}

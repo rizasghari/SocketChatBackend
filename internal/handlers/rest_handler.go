@@ -535,3 +535,22 @@ func (rh *RestHandler) DiscoverUsers(ctx *gin.Context) {
 		Data:    users,
 	})
 }
+
+func (rh *RestHandler) GetUserProfile(ctx *gin.Context) {
+	userID := utils.GetUserIdFromContext(ctx)
+	profile, errs := rh.authService.GetUserProfile(uint(userID))
+	if len(errs) > 0 {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errs,
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, models.Response{
+		Success: true,
+		Message: msgs.MsgOperationSuccessful,
+		Data:    profile,
+	})
+}

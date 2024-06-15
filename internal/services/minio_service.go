@@ -71,7 +71,7 @@ func (ms *MinioService) UploadFile(fileName string, file io.Reader, fileSize int
 		return "", err
 	}
 
-	publicUrl, err := ms.GetPublicFileUrl(bucketName, info.Key)
+	publicUrl, err := ms.getPublicFileUrl(bucketName, info.Key)
 	if err != nil {
 		log.Println(err)
 		return "", err
@@ -79,8 +79,7 @@ func (ms *MinioService) UploadFile(fileName string, file io.Reader, fileSize int
 	return publicUrl, nil
 }
 
-func (ms *MinioService) GetPublicFileUrl(bucketName, fileKey string) (string, error) {
-	externalEndpoint := ms.config.Viper.GetString("minio.external_endpoint")
-	path := fmt.Sprintf("http://%s/%s/%s", externalEndpoint, bucketName, fileKey)
+func (ms *MinioService) getPublicFileUrl(bucketName, fileKey string) (string, error) {
+	path := fmt.Sprintf("/%s/%s", bucketName, fileKey)
 	return path, nil
 }

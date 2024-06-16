@@ -131,7 +131,7 @@ func (ar *AuthenticationRepository) UpdateUserProfilePhoto(id uint, photo string
 	return nil
 }
 
-func (ar *AuthenticationRepository) UpdateUser(updateUserReq *models.UpdateUserRequest) (*models.UserResponse, []error) {
+func (ar *AuthenticationRepository) UpdateUser(updateUserReq *models.UpdateUserRequest) (*models.ProfileResponse, []error) {
 	var errors []error
 	var user models.User
 	updates := map[string]interface{}{
@@ -148,7 +148,7 @@ func (ar *AuthenticationRepository) UpdateUser(updateUserReq *models.UpdateUserR
 		return nil, errors
 	}
 
-	return user.ToUserResponse(), nil
+	return user.ToProfileResponse(), nil
 }
 
 func (ar *AuthenticationRepository) GetNotContactedYetUsers(userID uint, page, size int) (*models.GetUsersResponse, []error) {
@@ -208,5 +208,4 @@ func (ar *AuthenticationRepository) GetUserProfile(id int) (*models.ProfileRespo
 		errors = append(errors, errs.ErrUserNotFound)
 		return nil, errors
 	}
-	return user.ToProfileResponse(), nil
-}
+	return user.ToProfileResponse(),

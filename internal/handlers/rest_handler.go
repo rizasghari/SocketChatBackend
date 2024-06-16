@@ -11,6 +11,7 @@ import (
 	"socketChat/internal/msgs"
 	"socketChat/internal/services"
 	"socketChat/internal/utils"
+	"time"
 
 	"strconv"
 
@@ -331,7 +332,9 @@ func (rh *RestHandler) UploadUserProfilePhoto(ctx *gin.Context) {
 
 	// Generate a unique file name based on user ID and original file extension
 	fileExt := filepath.Ext(file.Filename)
-	fileName := fmt.Sprintf("user_profile_photo_%s%s", strconv.Itoa(int(userID)), fileExt)
+	// to avoid client side caching after profile photo upload
+	random := time.Now().Unix()
+	fileName := fmt.Sprintf("user_profile_photo_%s_%d%s", strconv.Itoa(int(userID)), random, fileExt)
 
 	// Upload the file to MinIO
 	url, err := rh.fileManagerService.UploadUserProfilePhoto(fileName, src, file.Size, file.Header.Get("Content-Type"), enums.FILE_BUCKET_USER_PROFILE)

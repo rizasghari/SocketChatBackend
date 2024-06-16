@@ -117,7 +117,7 @@ func (as *AuthenticationService) UpdateUserProfilePhoto(id uint, photo string) [
 	return as.authRepo.UpdateUserProfilePhoto(id, photo)
 }
 
-func (as *AuthenticationService) UpdateUser(user *models.UpdateUserRequest) (*models.UserResponse, []error) {
+func (as *AuthenticationService) UpdateUser(user *models.UpdateUserRequest) (*models.ProfileResponse, []error) {
 	var errors []error
 	if user.ID <= 0 {
 		errors = append(errors, errs.ErrInvalidParams)
@@ -146,5 +146,4 @@ func (as *AuthenticationService) GetUserProfile(userID uint) (*models.ProfileRes
 		errors = append(errors, errs.ErrInvalidParams)
 		return nil, errors
 	}
-	return as.authRepo.GetUserProfile(int(userID))
-}
+	return as.authRepo.GetUserProfile(int(userID)

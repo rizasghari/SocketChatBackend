@@ -1,9 +1,9 @@
 package repositories
 
 import (
+	"socketChat/internal/errs"
 	"socketChat/internal/models"
 	"socketChat/internal/utils"
-	"socketChat/internal/errs"
 	"time"
 
 	"gorm.io/gorm"
@@ -19,16 +19,15 @@ func NewChatRepository(db *gorm.DB) *ChatRepository {
 	}
 }
 
-func (chr *ChatRepository) CreateConversation(conversationData *models.CreateConversationRequestBody) (*models.Conversation, []error) {
+func (chr *ChatRepository) CreateConversation(conversationData *models.CreateConversationRequestBody) (*models.ConversationResponse, []error) {
 	var errors []error
 
-	conversation := &models.Conversation{
+	conversation := models.Conversation{
 		Type: conversationData.Type,
-		Name: conversationData.Name,
 	}
 
 	err := chr.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(conversation).Error; err != nil {
+		if err := tx.Create(&conversation).Error; err != nil {
 			// return any error will rollback
 			return err
 		}
@@ -54,7 +53,9 @@ func (chr *ChatRepository) CreateConversation(conversationData *models.CreateCon
 		return nil, errors
 	}
 
-	return conversation, nil
+	conversationResponse := conversation.ToConversationResponse()
+
+	return &conversationResponse, nil
 }
 
 func (chr *ChatRepository) GetUserConversations(userID uint, page, size int) (*models.ConversationListResponse, []error) {
@@ -170,4 +171,50 @@ func (chr *ChatRepository) SeenMessage(messageId, seenerId uint) []error {
 		return errors
 	}
 	return nil
+}
+
+func (chr *ChatRepository) FindConversationBetweenTwoUsers(userID1, userID2 uint) (uint, []error) {
+	var errors []error
+
+	rows, err := chr.db.Table("conversation_members AS cm1").
+		Select("cm1.conversation_id").
+		Joins("INNER JOIN conversation_members AS cm2 ON cm1.conversation_id = cm2.conversation_id").
+		Where("cm1.user_id = ? AND cm2.user_id = ?", userID1, userID2).
+		Rows()
+
+	if err != nil {
+		errors = append(errors, err)
+		return 0, errors
+	}
+	defer rows.Close()
+
+	var conversationID uint
+	for rows.Next() {
+		if err := rows.Scan(&conversationID); err != nil {
+			errors = append(errors, err)
+			return 0, errors
+		}
+	}
+	if err := rows.Err(); err != nil {
+		errors = append(errors, err)
+		return 0, errors
+	}
+
+	return conversationID, nil
+}
+
+func (chr *ChatRepository) GetConversationById(conversationID uint) (*models.ConversationResponse, []error) {
+	var errors []error
+	var conversation models.Conversation
+	result := chr.db.Where("id = ?", conversationID).First(&conversation)
+	if err := result.Error; err != nil {
+		errors = append(errors, err)
+		return nil, errors
+	}
+	if result.RowsAffected == 0 {
+		errors = append(errors, errs.ErrConversationNotFound)
+		return nil, errors
+	}
+	conversationResponse := conversation.ToConversationResponse()
+	return &conversationResponse, nil
 }

@@ -16,8 +16,14 @@ func NewChatService(chatRepo *repositories.ChatRepository) *ChatService {
 	}
 }
 
-func (cs *ChatService) CreateConversation(conversationData *models.CreateConversationRequestBody) (*models.Conversation, []error) {
-	// TODO: Add conversation validation
+func (cs *ChatService) CreateConversation(conversationData *models.CreateConversationRequestBody) (*models.ConversationResponse, []error) {
+	existingConversationId, errs := cs.chatRepo.FindConversationBetweenTwoUsers(conversationData.Users[0], conversationData.Users[1])
+	if len(errs) > 0 {
+		return nil, errs
+	}
+	if existingConversationId > 0 {
+		return cs.chatRepo.GetConversationById(existingConversationId)
+	}
 	return cs.chatRepo.CreateConversation(conversationData)
 }
 

@@ -208,4 +208,5 @@ func (ar *AuthenticationRepository) GetUserProfile(id int) (*models.ProfileRespo
 		errors = append(errors, errs.ErrUserNotFound)
 		return nil, errors
 	}
-	return user.ToProfileResponse(),
+	return user.ToProfileResponse(), nil
+}

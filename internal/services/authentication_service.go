@@ -146,4 +146,5 @@ func (as *AuthenticationService) GetUserProfile(userID uint) (*models.ProfileRes
 		errors = append(errors, errs.ErrInvalidParams)
 		return nil, errors
 	}
-	return as.authRepo.GetUserProfile(int(userID)
+	return as.authRepo.GetUserProfile(int(userID))
+}

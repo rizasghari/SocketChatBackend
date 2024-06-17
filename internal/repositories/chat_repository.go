@@ -69,6 +69,7 @@ func (chr *ChatRepository) GetUserConversations(userID uint, page, size int) (*m
 			Scopes(utils.Paginate(page, size)).
 			Preload("Members").
 			Where("id IN (SELECT conversation_id FROM conversation_members WHERE user_id = ?)", userID).
+			Order("updated_at DESC").
 			Find(&conversations).Error; err != nil {
 			return err
 		}

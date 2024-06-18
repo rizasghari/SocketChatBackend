@@ -47,10 +47,10 @@ func (cs *ChatService) CheckUserInConversation(userID, conversationID uint) bool
 	return cs.chatRepo.CheckUserInConversation(userID, conversationID)
 }
 
-func (cs *ChatService) SeenMessage(messageId, seenerId uint) []error {
+func (cs *ChatService) SeenMessage(messageIds []uint, seenerId uint) []error {
 	// Validate message id
-	if messageId <= 0 {
+	if len(messageIds) <= 0 {
 		return []error{errs.ErrMessageNotFound}
 	}
-	return cs.chatRepo.SeenMessage(messageId, seenerId)
+	return cs.chatRepo.SeenMessage(messageIds, seenerId)
 }

@@ -1,5 +1,5 @@
 package models
 
 type SeenMessagePayload struct {
-	MessageId      uint `json:"message_id"`
+	MessageIds []uint `json:"message_ids"`
 }

@@ -300,8 +300,11 @@ func (sh *SocketHandler) handleSeenMessageEvent(payload json.RawMessage, event s
 		errors = append(errors, err)
 		return errors
 	}
+
+	log.Println("seenData: ", seenData)
+
 	// Mark message as seen in DB
-	errs := sh.chatService.SeenMessage(seenData.MessageId, seenerId)
+	errs := sh.chatService.SeenMessage(seenData.MessageIds, seenerId)
 	if len(errs) > 0 {
 		errors = append(errors, errs...)
 		return errors

@@ -159,16 +159,16 @@ func (chr *ChatRepository) CheckUserInConversation(userID, conversationID uint) 
 	return count > 0
 }
 
-func (chr *ChatRepository) SeenMessage(messageId, seenerId uint) []error {
+func (chr *ChatRepository) SeenMessage(messageIds []uint, seenerId uint) []error {
 	var errors []error
 	// Update if not seen yet and sender is not the seener to prevent message owner from marking it as seen
-	result := chr.db.Model(&models.Message{}).Where("id = ? AND seen_at IS NULL AND sender_id != ?", messageId, seenerId).Update("seen_at", time.Now())
+	result := chr.db.Model(&models.Message{}).Where("id IN ? AND seen_at IS NULL AND sender_id != ?", messageIds, seenerId).Update("seen_at", time.Now())
 	if err := result.Error; err != nil {
 		errors = append(errors, err)
 		return errors
 	}
 	if result.RowsAffected == 0 {
-		errors = append(errors, errs.ErrMessageNotFound)
+		errors = append(errors, errs.NoneOfMessagesSeen)
 		return errors
 	}
 	return nil

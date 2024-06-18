@@ -25,6 +25,7 @@ const (
 	ErrMessageNotFound = Error("message not found")
 
 	ErrConversationNotFound = Error("conversation not found")
+	NoneOfMessagesSeen      = Error("none of messages seen")
 
 	ErrInvalidRequestBody = Error("invalid request body")
 	ErrUserAlreadyExists  = Error("user already exists")

@@ -209,10 +209,46 @@ func (sh *SocketHandler) handleIncommingMessagesWithEvent(ws *websocket.Conn, us
 			if len(errs) > 0 {
 				log.Printf("handleIncommingMessagesWithEvent - Error while handling seen message event: %v", errs)
 			}
+		case enums.SOCKET_EVENT_IS_TYPING:
+			errs := sh.handleIsTypingEvent(event.Payload, enums.SOCKET_EVENT_IS_TYPING, conversationId)
+			if len(errs) > 0 {
+				log.Printf("handleIncommingMessagesWithEvent - Error while handling is typing event: %v", errs)
+			}
 		default:
 			log.Printf("Unknown event: %v", event)
 		}
 	}
+}
+
+func (sh *SocketHandler) handleIsTypingEvent(payload json.RawMessage, event string, conversationId uint) []error {
+	var errors []error
+	var isTypingPayload socketModels.IsTypingPayload
+	err := json.Unmarshal(payload, &isTypingPayload)
+	if err != nil {
+		errors = append(errors, errs.ErrInvalidRequest)
+		return errors
+	}
+
+	log.Println("isTypingPayload: ", isTypingPayload)
+	
+	// Publish the new message to Redis
+	redisEvent := redisModels.RedisPublishedMessage{
+		Event:          event,
+		ConversationID: conversationId,
+		Payload:        isTypingPayload,
+	}
+
+	jsonEvent, err := json.Marshal(redisEvent)
+	if err != nil {
+		errors = append(errors, err)
+		return errors
+	}
+	log.Println("jsonEvent: ", string(jsonEvent))
+	if err := sh.PublishMessage(sh.hub.Redis, "chat_channel", jsonEvent); err != nil {
+		errors = append(errors, err)
+		return errors
+	}
+	return nil
 }
 
 func (sh *SocketHandler) handleSendMessageEvent(payload json.RawMessage, event string, userInfo *models.Claims, conversationId uint) []error {
@@ -237,13 +273,13 @@ func (sh *SocketHandler) handleSendMessageEvent(payload json.RawMessage, event s
 		return errors
 	}
 
+	// Publish the new message to Redis
 	redisEvent := redisModels.RedisPublishedMessage{
 		Event:          event,
 		ConversationID: conversationId,
 		Payload:        savedMessage,
 	}
 
-	// Publish the new message to Redis
 	jsonEvent, err := json.Marshal(redisEvent)
 	if err != nil {
 		errors = append(errors, err)

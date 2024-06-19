@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"socketChat/internal/msgs"
 	"socketChat/internal/utils"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -71,7 +73,33 @@ func (suoh *SocketUserObservingHandler) HandleSocketUserObservingRoute(ctx *gin.
 		return
 	}
 
-	suoh.HandleConnections(ctx, userInfo)
+	notifiers, err := suoh.retrieveNotifiers(ctx)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{err},
+		})
+	}
+
+	suoh.HandleConnections(ctx, userInfo, notifiers)
+}
+
+func (suoh *SocketUserObservingHandler) retrieveNotifiers(ctx *gin.Context) ([]uint, error) {
+	notifiersQuery := ctx.Query("subscribe")
+	if notifiersQuery == "" {
+		return []uint{}, errs.ErrInvalidRequest
+	}
+	strNotifiers := strings.Split(notifiersQuery, ",")
+	var notifiers []uint
+	for _, strNum := range strNotifiers {
+		num, err := strconv.Atoi(strNum)
+		if err != nil {
+			return []uint{}, errs.ErrInvalidRequest
+		}
+		notifiers = append(notifiers, uint(num))
+	}
+	return notifiers, nil
 }
 
 func (suoh *SocketUserObservingHandler) StartUserObservingSocket() {
@@ -87,7 +115,7 @@ func (suoh *SocketUserObservingHandler) InitializeSocketUpgrader() {
 	}
 }
 
-func (suoh *SocketUserObservingHandler) HandleConnections(ctx *gin.Context, userInfo *models.Claims) {
+func (suoh *SocketUserObservingHandler) HandleConnections(ctx *gin.Context, userInfo *models.Claims, notifiers []uint) {
 	ws, err := suoh.upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
 		log.Printf("Failed to upgrade connection: %v", err)
@@ -100,19 +128,19 @@ func (suoh *SocketUserObservingHandler) HandleConnections(ctx *gin.Context, user
 		}
 	}(ws)
 
-	// Handle disconnection
-	suoh.handleDiconnectedClient(ws, userInfo.ID)
+	// unsubscribe from hub and notifiers if user disconnects
+	suoh.setObserverDisconnectedListener(&models.SocketClient{Conn: ws, UserId: userInfo.ID})
 
-	// Add client to hub
-	suoh.handleConversationAndClinet(userInfo.ID, ws)
+	// Add observer to observing notifiers and subscribe to hub
+	suoh.subscribeObserverToNotifiers(userInfo.ID, notifiers, ws)
 
 	// Handle incoming messages
 	suoh.handleIncommingMessagesWithEvent(ws, userInfo)
 }
 
-func (sch *SocketUserObservingHandler) handleDiconnectedClient(ws *websocket.Conn, userId uint) {
-	ws.SetCloseHandler(func(code int, text string) error {
-		sch.deleteDiconnectedClientFromConversation(userId)
+func (sch *SocketUserObservingHandler) setObserverDisconnectedListener(observer *models.SocketClient) {
+	observer.Conn.SetCloseHandler(func(code int, text string) error {
+		sch.unsubscribeObserverFromNotifiers(observer.UserId)
 		return nil
 	})
 }
@@ -142,6 +170,35 @@ func (suoh *SocketUserObservingHandler) subscribeObserverToNotifiers(observer ui
 	}
 }
 
+func (suoh *SocketUserObservingHandler) unsubscribeObserverFromNotifiers(observer uint) {
+	suoh.mu.Lock()
+	defer suoh.mu.Unlock()
+
+	notifiers, err := suoh.fetchObserverNotifiersFromCache(observer)
+	if err != nil {
+		log.Println("Could not fetch observer notifiers from cache: %v", err)
+		return
+	}
+
+	if len(notifiers) == 0 {
+		return
+	}
+
+	for _, notifier := range notifiers {
+		for i, client := range suoh.hub.Notifiers[notifier] {
+			if client.UserId == observer {
+				suoh.hub.Notifiers[notifier] = append(suoh.hub.Notifiers[notifier][:i], suoh.hub.Notifiers[notifier][i+1:]...)
+				break
+			}
+		}
+		// Check if the notifier observers is empty and remove it from the hub
+		if len(suoh.hub.Notifiers[notifier]) == 0 {
+			delete(suoh.hub.Notifiers, notifier)
+		}
+	}
+
+}
+
 func (suoh *SocketUserObservingHandler) saveObserverNotifiersInCache(observer uint, notifier uint) error {
 	key := fmt.Sprintf("observer_notifiers_%d", observer)
 	err := suoh.hub.Redis.RPush(suoh.ctx, key, fmt.Sprintf("%d", notifier)).Err()
@@ -154,11 +211,15 @@ func (suoh *SocketUserObservingHandler) saveObserverNotifiersInCache(observer ui
 func (souh *SocketUserObservingHandler) fetchObserverNotifiersFromCache(observer uint) ([]uint, error) {
 	key := fmt.Sprintf("observer_notifiers_%d", observer)
 	value, err := souh.hub.Redis.LRange(souh.ctx, key, 0, -1).Result()
-	if err != nil {return nil, err}
+	if err != nil {
+		return nil, err
+	}
 	notifiers := make([]uint, len(value))
 	for i, str := range value {
 		notifier, err := strconv.ParseUint(str, 10, 32)
-		if err != nil {return nil, err}
+		if err != nil {
+			return nil, err
+		}
 		notifiers[i] = uint(notifier)
 	}
 	return notifiers, nil
@@ -198,24 +259,6 @@ func (suoh *SocketUserObservingHandler) HandleRedisMessages() {
 		}
 		suoh.SendMessageToClient(redisMessage)
 	}
-}
-
-func (sch *SocketUserObservingHandler) unSubscribeObserverFromNotifiers(userId uint) {
-	sch.mu.Lock()
-	defer sch.mu.Unlock()
-	// Remove disconnected client from conversation
-	for i, client := range sch.hub.Notifiers[userId] {
-		if client.UserId == userId {
-			sch.hub.Notifiers[userId] = append(sch.hub.Notifiers[userId][:i], sch.hub.Notifiers[userId][i+1:]...)
-			break
-		}
-	}
-	// Check if the conversation is empty and remove it from the map
-	if len(sch.hub.Conversations[conversationId]) == 0 {
-		delete(sch.hub.Conversations, conversationId)
-	}
-	// Log conversations for debug purposes
-	sch.logConversations()
 }
 
 func (sch *SocketUserObservingHandler) HandleRedisMessages() {

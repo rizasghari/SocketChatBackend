@@ -19,28 +19,31 @@ var (
 )
 
 type HttpServer struct {
-	router        *gin.Engine
-	restHandler   *handlers.RestHandler
-	htmlHandler   *handlers.HtmlHandler
-	socketHandler *handlers.SocketHandler
-	redis         *redis.Client
-	ctx           context.Context
+	router                     *gin.Engine
+	restHandler                *handlers.RestHandler
+	htmlHandler                *handlers.HtmlHandler
+	socketChatHandler          *handlers.SocketChatHandler
+	socketUserObservingHandler *handlers.SocketUserObservingHandler
+	redis                      *redis.Client
+	ctx                        context.Context
 }
 
 func NewHttpServer(
 	ctx context.Context,
 	redis *redis.Client,
 	restHandler *handlers.RestHandler,
-	socketHandler *handlers.SocketHandler,
+	socketChatHandler *handlers.SocketChatHandler,
+	socketUserObservingHandler *handlers.SocketUserObservingHandler,
 	htmlHandler *handlers.HtmlHandler,
 ) *HttpServer {
 	once.Do(func() {
 		httpServer = &HttpServer{
-			restHandler:   restHandler,
-			redis:         redis,
-			ctx:           ctx,
-			socketHandler: socketHandler,
-			htmlHandler:   htmlHandler,
+			restHandler:                restHandler,
+			redis:                      redis,
+			ctx:                        ctx,
+			socketChatHandler:          socketChatHandler,
+			socketUserObservingHandler: socketUserObservingHandler,
+			htmlHandler:                htmlHandler,
 		}
 	})
 	return httpServer
@@ -50,10 +53,10 @@ func (hs *HttpServer) Run() {
 	hs.initializeGin()
 	hs.setupWebSocketRoutes()
 	hs.setupRestfulRoutes()
-	hs.socketHandler.StartSocket()
+	hs.socketChatHandler.StartSocket()
 	server := hs.startServer()
 	// Wait for interrupt signal to gracefully shut down the server
-	hs.socketHandler.WaitForShutdown(server)
+	hs.socketChatHandler.WaitForShutdown(server)
 }
 
 func (hs *HttpServer) initializeGin() {
@@ -76,7 +79,7 @@ func (hs *HttpServer) setupRestfulRoutes() {
 	hs.router.NoRoute(hs.htmlHandler.NotFound)
 
 	// Apply the CORS middleware to the router
-    hs.router.Use(handlers.CORSMiddleware())
+	hs.router.Use(handlers.CORSMiddleware())
 
 	web := hs.router.Group("/")
 	{
@@ -110,7 +113,8 @@ func (hs *HttpServer) setupRestfulRoutes() {
 }
 
 func (hs *HttpServer) setupWebSocketRoutes() {
-	hs.router.GET("/ws", hs.socketHandler.HandleSocketRoute)
+	hs.router.GET("/ws/chat", hs.socketChatHandler.HandleSocketChatRoute)
+	hs.router.GET("/ws/observe", hs.socketUserObservingHandler.HandleSocketObservingRoute)
 }
 
 func (hs *HttpServer) startServer() *http.Server {

@@ -174,16 +174,22 @@ func (suoh *SocketUserObservingHandler) unsubscribeObserverFromNotifiers(observe
 	suoh.mu.Lock()
 	defer suoh.mu.Unlock()
 
+	// Fetch observer notifiers from cache
 	notifiers, err := suoh.fetchObserverNotifiersFromCache(observer)
 	if err != nil {
 		log.Println("Could not fetch observer notifiers from cache: %v", err)
 		return
 	}
+	if len(notifiers) == 0 {return}
 
-	if len(notifiers) == 0 {
+	// Remove observer from redis cache
+	err = suoh.hub.Redis.Del(suoh.ctx, fmt.Sprintf("observer_notifiers_%d", observer)).Err()
+	if err != nil {
+		log.Println("Could not remove observer from redis cache: %v", err)
 		return
 	}
 
+	// Remove observer from notifiers
 	for _, notifier := range notifiers {
 		for i, client := range suoh.hub.Notifiers[notifier] {
 			if client.UserId == observer {
@@ -196,7 +202,6 @@ func (suoh *SocketUserObservingHandler) unsubscribeObserverFromNotifiers(observe
 			delete(suoh.hub.Notifiers, notifier)
 		}
 	}
-
 }
 
 func (suoh *SocketUserObservingHandler) saveObserverNotifiersInCache(observer uint, notifier uint) error {

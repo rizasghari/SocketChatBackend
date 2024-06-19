@@ -125,32 +125,43 @@ func (suoh *SocketUserObservingHandler) subscribeObserverToNotifiers(observer ui
 		if _, exists := suoh.hub.Notifiers[notifier]; !exists {
 			suoh.hub.Notifiers[notifier] = []*models.SocketClient{}
 		}
-		// Add observer to notifier if not observing yet
-		if isAlreadyObserving := slices.Contains(suoh.hub.Notifiers[notifier], &models.SocketClient{Conn: ws, UserId: observer}); !isAlreadyObserving {
+		// Add observer to notifier if not observing yet and save it in redis cache
+		if observing := slices.Contains(suoh.hub.Notifiers[notifier], &models.SocketClient{Conn: ws, UserId: observer}); !observing {
+			err := suoh.saveObserverNotifiersInCache(observer, notifier)
+			if err != nil {
+				log.Fatalf("Could not add the notifier to observer notifiers in cache: %v", err)
+				return
+			}
 			suoh.hub.Notifiers[notifier] = append(suoh.hub.Notifiers[notifier],
 				&models.SocketClient{
 					Conn:   ws,
 					UserId: observer,
 				},
 			)
-			err := suoh.saveObserverNotifiersInCache(observer, notifier)
-			if err != nil {
-				log.Fatalf("Could not save the slice: %v", err)
-				return
-			}
 		}
 	}
 }
 
-func (suoh *SocketUserObservingHandler) saveObserverNotifiersInCache(observerUserId uint, notifierToObserve uint) error {
-	notifierStr := fmt.Sprintf("%d", notifierToObserve)
-	key := fmt.Sprintf("observer-%d", observerUserId)
-	err := suoh.hub.Redis.RPush(suoh.ctx, key, notifierStr).Err()
+func (suoh *SocketUserObservingHandler) saveObserverNotifiersInCache(observer uint, notifier uint) error {
+	key := fmt.Sprintf("observer_notifiers_%d", observer)
+	err := suoh.hub.Redis.RPush(suoh.ctx, key, fmt.Sprintf("%d", notifier)).Err()
 	if err != nil {
-		log.Fatalf("Could not save the slice: %v", err)
 		return err
 	}
 	return nil
+}
+
+func (souh *SocketUserObservingHandler) fetchObserverNotifiersFromCache(observer uint) ([]uint, error) {
+	key := fmt.Sprintf("observer_notifiers_%d", observer)
+	value, err := souh.hub.Redis.LRange(souh.ctx, key, 0, -1).Result()
+	if err != nil {return nil, err}
+	notifiers := make([]uint, len(value))
+	for i, str := range value {
+		notifier, err := strconv.ParseUint(str, 10, 32)
+		if err != nil {return nil, err}
+		notifiers[i] = uint(notifier)
+	}
+	return notifiers, nil
 }
 
 func (sch *SocketUserObservingHandler) handleIncommingMessagesWithEvent(ws *websocket.Conn, userInfo *models.Claims, conversationId uint) {

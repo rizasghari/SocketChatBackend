@@ -11,7 +11,6 @@ import (
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
 	redisModels "socketChat/internal/models/redis"
-	"socketChat/internal/models/socket/observing"
 	obsSocketModels "socketChat/internal/models/socket/observing"
 	"socketChat/internal/msgs"
 	"socketChat/internal/services"
@@ -29,18 +28,22 @@ type SocketUserObservingHandler struct {
 	mu          sync.Mutex
 	ctx         context.Context
 	upgrader    websocket.Upgrader
-	hub         *observing.SocketUserObservingHub
+	hub         *obsSocketModels.SocketUserObservingHub
 	authService *services.AuthenticationService
 }
 
-func NewSocketUserObservingHandler(redis *redis.Client, ctx context.Context, authService *services.AuthenticationService) *SocketUserObservingHandler {
+func NewSocketUserObservingHandler(
+	redis *redis.Client,
+	ctx context.Context,
+	authService *services.AuthenticationService,
+) *SocketUserObservingHandler {
 	suoh := &SocketUserObservingHandler{
-		ctx: ctx,
+		ctx:         ctx,
 		authService: authService,
-		hub: &observing.SocketUserObservingHub{
+		hub: &obsSocketModels.SocketUserObservingHub{
 			Notifiers: make(map[uint][]*models.SocketClient),
 			Mu:        sync.Mutex{},
-			Redis:     nil,
+			Redis:     redis,
 		},
 	}
 	go suoh.handleRedisMessages()
@@ -79,17 +82,6 @@ func (suoh *SocketUserObservingHandler) HandleSocketUserObservingRoute(ctx *gin.
 		return
 	}
 
-	// Get operation
-	operation := ctx.Param("operation")
-	if operation == "" {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
-			Success: false,
-			Message: msgs.MsgOperationFailed,
-			Errors:  []error{errs.ErrObservingSocketOperationRequired},
-		})
-		return
-	}
-
 	// Upgrade HTTP connection to WebSocket
 	ws, err := suoh.upgradeHttpToWs(ctx)
 	if err != nil {
@@ -102,58 +94,31 @@ func (suoh *SocketUserObservingHandler) HandleSocketUserObservingRoute(ctx *gin.
 	}
 	defer ws.Close()
 
-	// Handle operation
-	switch operation {
-	case enums.OBS_SOCK_OP_SUBSCRIBE:
-		notifiers, err := suoh.retrieveNotifiersFromQuery(ctx)
-		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
-				Success: false,
-				Message: msgs.MsgOperationFailed,
-				Errors:  []error{err},
-			})
-		}
-		suoh.handleSubsciption(ctx, ws, userInfo, notifiers)
-	case enums.OBS_SOCK_OP_SET_STATUS:
-		status, err := suoh.retrieveStatusFromQuery(ctx)
-		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
-				Success: false,
-				Message: msgs.MsgOperationFailed,
-				Errors:  []error{err},
-			})
-		}
-		suoh.handleSetOnlineStatus(ctx, ws, userInfo, status)
-	default:
+	// Set the user online status to online
+	suoh.setOnlineStatus(userInfo.ID, true)
+
+	// Subscribe to notifiers
+	notifiers, err := suoh.retrieveNotifiersFromQuery(ctx)
+	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
 			Success: false,
 			Message: msgs.MsgOperationFailed,
-			Errors:  []error{errs.ErrInvalidObservingSocketOperation},
+			Errors:  []error{err},
 		})
-		return
 	}
+	suoh.handleSubscription(ws, userInfo, notifiers)
 }
 
-func (souh *SocketUserObservingHandler) retrieveStatusFromQuery(ctx *gin.Context) (string, error) {
-	statusQuery := ctx.Query("status")
-	if statusQuery == "" {
-		return "", errs.ErrObservingSocketStatusRequired
-	}
-	return statusQuery, nil
-}
-
-func (suoh *SocketUserObservingHandler) handleSetOnlineStatus(ctx *gin.Context, ws *websocket.Conn, userInfo *models.Claims, status string) {
-	isOnline := strings.ToLower(status) == "online"
-
+func (suoh *SocketUserObservingHandler) setOnlineStatus(userId uint, status bool) {
 	// set user online status in db
 
 	// Publish the new event to Redis
 	redisEvent := obsSocketModels.ObservingSocketEvent{
-		Event: enums.OBS_SOCK_OP_NOTIFY,
+		Event: enums.SOCKET_EVENT_NOTIFY,
 		Payload: obsSocketModels.ObservingSocketPayload{
-			UserId:   userInfo.ID,
-			IsOnline: isOnline,
-			LastSeen: nil,
+			UserId:   userId,
+			IsOnline: status,
+			LastSeenAt: nil,
 		},
 	}
 
@@ -162,7 +127,7 @@ func (suoh *SocketUserObservingHandler) handleSetOnlineStatus(ctx *gin.Context, 
 		log.Println("failed to marshal jsonEvent: ", err)
 		return
 	}
-	log.Println("jsonEvent: ", string(jsonEvent))
+	log.Println("setOnlineStatus jsonEvent: ", string(jsonEvent))
 	if err := suoh.publishMessage(suoh.hub.Redis, redisModels.REDIS_CHANNEL_OBSERVE, jsonEvent); err != nil {
 		log.Println("failed to publish message: ", err)
 		return
@@ -183,6 +148,7 @@ func (suoh *SocketUserObservingHandler) retrieveNotifiersFromQuery(ctx *gin.Cont
 		}
 		notifiers = append(notifiers, uint(num))
 	}
+	log.Println("retrieveNotifiersFromQuery notifiers: ", notifiers)
 	return notifiers, nil
 }
 
@@ -205,7 +171,7 @@ func (suoh *SocketUserObservingHandler) upgradeHttpToWs(ctx *gin.Context) (*webs
 	return ws, nil
 }
 
-func (suoh *SocketUserObservingHandler) handleSubsciption(ctx *gin.Context, ws *websocket.Conn, userInfo *models.Claims, notifiers []uint) {
+func (suoh *SocketUserObservingHandler) handleSubscription(ws *websocket.Conn, userInfo *models.Claims, notifiers []uint) {
 	observer := &models.SocketClient{
 		Conn:   ws,
 		UserId: userInfo.ID,
@@ -249,10 +215,13 @@ func (suoh *SocketUserObservingHandler) unsubscribeObserverFromNotifiers(observe
 	suoh.mu.Lock()
 	defer suoh.mu.Unlock()
 
+	// set the observer offline
+	suoh.setOnlineStatus(observer, false)
+
 	// Fetch observer notifiers from cache
 	notifiers, err := suoh.fetchObserverNotifiersFromCache(observer)
 	if err != nil {
-		log.Println("Could not fetch observer notifiers from cache: %v", err)
+		log.Printf("Could not fetch observer notifiers from cache: %v", err)
 		return
 	}
 	if len(notifiers) == 0 {
@@ -262,7 +231,7 @@ func (suoh *SocketUserObservingHandler) unsubscribeObserverFromNotifiers(observe
 	// Remove observer from redis cache
 	err = suoh.hub.Redis.Del(suoh.ctx, fmt.Sprintf("observer_notifiers_%d", observer)).Err()
 	if err != nil {
-		log.Println("Could not remove observer from redis cache: %v", err)
+		log.Printf("Could not remove observer from redis cache: %v", err)
 		return
 	}
 
@@ -322,7 +291,6 @@ func (suoh *SocketUserObservingHandler) handleRedisMessages() {
 func (suoh *SocketUserObservingHandler) sendMessageToClient(redisMessage obsSocketModels.ObservingSocketEvent) {
 	suoh.mu.Lock()
 	defer suoh.mu.Unlock()
-
 	if notifier, ok := suoh.hub.Notifiers[redisMessage.Payload.UserId]; ok {
 		for _, client := range notifier {
 			if err := client.Conn.WriteJSON(redisMessage); err != nil {

@@ -114,7 +114,7 @@ func (hs *HttpServer) setupRestfulRoutes() {
 
 func (hs *HttpServer) setupWebSocketRoutes() {
 	hs.router.GET("/ws/chat", hs.socketChatHandler.HandleSocketChatRoute)
-	hs.router.GET("/ws/observe", hs.socketUserObservingHandler.HandleSocketObservingRoute)
+	hs.router.GET("/ws/observe", hs.socketUserObservingHandler.HandleSocketUserObservingRoute)
 }
 
 func (hs *HttpServer) startServer() *http.Server {

@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,9 +10,11 @@ import (
 	"socketChat/internal/enums"
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
-	socketModels "socketChat/internal/models/socket"
+	redisModels "socketChat/internal/models/redis"
 	"socketChat/internal/models/socket/observing"
+	obsSocketModels "socketChat/internal/models/socket/observing"
 	"socketChat/internal/msgs"
+	"socketChat/internal/services"
 	"socketChat/internal/utils"
 	"strconv"
 	"strings"
@@ -24,21 +26,25 @@ import (
 )
 
 type SocketUserObservingHandler struct {
-	mu       sync.Mutex
-	ctx      context.Context
-	upgrader websocket.Upgrader
-	hub      *observing.SocketUserObservingHub
+	mu          sync.Mutex
+	ctx         context.Context
+	upgrader    websocket.Upgrader
+	hub         *observing.SocketUserObservingHub
+	authService *services.AuthenticationService
 }
 
-func NewSocketUserObservingHandler(ctx context.Context, redis *redis.Client) *SocketUserObservingHandler {
-	return &SocketUserObservingHandler{
+func NewSocketUserObservingHandler(redis *redis.Client, ctx context.Context, authService *services.AuthenticationService) *SocketUserObservingHandler {
+	suoh := &SocketUserObservingHandler{
 		ctx: ctx,
+		authService: authService,
 		hub: &observing.SocketUserObservingHub{
 			Notifiers: make(map[uint][]*models.SocketClient),
 			Mu:        sync.Mutex{},
 			Redis:     nil,
 		},
 	}
+	go suoh.handleRedisMessages()
+	return suoh
 }
 
 func (suoh *SocketUserObservingHandler) HandleSocketUserObservingRoute(ctx *gin.Context) {
@@ -52,7 +58,6 @@ func (suoh *SocketUserObservingHandler) HandleSocketUserObservingRoute(ctx *gin.
 		})
 		return
 	}
-
 	userInfo, err := utils.VerifyToken(jwtToken)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
@@ -97,21 +102,22 @@ func (suoh *SocketUserObservingHandler) HandleSocketUserObservingRoute(ctx *gin.
 	}
 	defer ws.Close()
 
+	// Handle operation
 	switch operation {
 	case enums.OBS_SOCK_OP_SUBSCRIBE:
 		notifiers, err := suoh.retrieveNotifiersFromQuery(ctx)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
 				Success: false,
 				Message: msgs.MsgOperationFailed,
 				Errors:  []error{err},
 			})
 		}
 		suoh.handleSubsciption(ctx, ws, userInfo, notifiers)
-	case enums.OB_SOCK_OP_SET_STATUS:
+	case enums.OBS_SOCK_OP_SET_STATUS:
 		status, err := suoh.retrieveStatusFromQuery(ctx)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
 				Success: false,
 				Message: msgs.MsgOperationFailed,
 				Errors:  []error{err},
@@ -137,9 +143,30 @@ func (souh *SocketUserObservingHandler) retrieveStatusFromQuery(ctx *gin.Context
 }
 
 func (suoh *SocketUserObservingHandler) handleSetOnlineStatus(ctx *gin.Context, ws *websocket.Conn, userInfo *models.Claims, status string) {
+	isOnline := strings.ToLower(status) == "online"
+
 	// set user online status in db
 
-	// notify all observers
+	// Publish the new event to Redis
+	redisEvent := obsSocketModels.ObservingSocketEvent{
+		Event: enums.OBS_SOCK_OP_NOTIFY,
+		Payload: obsSocketModels.ObservingSocketPayload{
+			UserId:   userInfo.ID,
+			IsOnline: isOnline,
+			LastSeen: nil,
+		},
+	}
+
+	jsonEvent, err := json.Marshal(redisEvent)
+	if err != nil {
+		log.Println("failed to marshal jsonEvent: ", err)
+		return
+	}
+	log.Println("jsonEvent: ", string(jsonEvent))
+	if err := suoh.publishMessage(suoh.hub.Redis, redisModels.REDIS_CHANNEL_OBSERVE, jsonEvent); err != nil {
+		log.Println("failed to publish message: ", err)
+		return
+	}
 }
 
 func (suoh *SocketUserObservingHandler) retrieveNotifiersFromQuery(ctx *gin.Context) ([]uint, error) {
@@ -157,10 +184,6 @@ func (suoh *SocketUserObservingHandler) retrieveNotifiersFromQuery(ctx *gin.Cont
 		notifiers = append(notifiers, uint(num))
 	}
 	return notifiers, nil
-}
-
-func (suoh *SocketUserObservingHandler) StartUserObservingSocket() {
-	go suoh.HandleRedisMessages()
 }
 
 func (suoh *SocketUserObservingHandler) upgradeHttpToWs(ctx *gin.Context) (*websocket.Conn, error) {
@@ -183,25 +206,26 @@ func (suoh *SocketUserObservingHandler) upgradeHttpToWs(ctx *gin.Context) (*webs
 }
 
 func (suoh *SocketUserObservingHandler) handleSubsciption(ctx *gin.Context, ws *websocket.Conn, userInfo *models.Claims, notifiers []uint) {
-
-	// unsubscribe from hub and notifiers if user disconnects
-	suoh.setObserverDisconnectedListener(&models.SocketClient{Conn: ws, UserId: userInfo.ID})
+	observer := &models.SocketClient{
+		Conn:   ws,
+		UserId: userInfo.ID,
+	}
 
 	// Add observer to observing notifiers and subscribe to hub
-	suoh.subscribeObserverToNotifiers(userInfo.ID, notifiers, ws)
+	suoh.subscribeObserverToNotifiers(observer, notifiers)
 
-	// Handle incoming messages
-	suoh.handleIncommingMessagesWithEvent(ws, userInfo)
+	// unsubscribe from hub and notifiers if user disconnects
+	suoh.setObserverDisconnectionListener(observer)
 }
 
-func (sch *SocketUserObservingHandler) setObserverDisconnectedListener(observer *models.SocketClient) {
+func (sch *SocketUserObservingHandler) setObserverDisconnectionListener(observer *models.SocketClient) {
 	observer.Conn.SetCloseHandler(func(code int, text string) error {
 		sch.unsubscribeObserverFromNotifiers(observer.UserId)
 		return nil
 	})
 }
 
-func (suoh *SocketUserObservingHandler) subscribeObserverToNotifiers(observer uint, notifiersToObserve []uint, ws *websocket.Conn) {
+func (suoh *SocketUserObservingHandler) subscribeObserverToNotifiers(observer *models.SocketClient, notifiersToObserve []uint) {
 	suoh.mu.Lock()
 	defer suoh.mu.Unlock()
 	for _, notifier := range notifiersToObserve {
@@ -210,18 +234,13 @@ func (suoh *SocketUserObservingHandler) subscribeObserverToNotifiers(observer ui
 			suoh.hub.Notifiers[notifier] = []*models.SocketClient{}
 		}
 		// Add observer to notifier if not observing yet and save it in redis cache
-		if observing := slices.Contains(suoh.hub.Notifiers[notifier], &models.SocketClient{Conn: ws, UserId: observer}); !observing {
-			err := suoh.saveObserverNotifiersInCache(observer, notifier)
+		if observing := slices.Contains(suoh.hub.Notifiers[notifier], &models.SocketClient{Conn: observer.Conn, UserId: observer.UserId}); !observing {
+			err := suoh.saveObserverNotifiersInCache(observer.UserId, notifier)
 			if err != nil {
 				log.Fatalf("Could not add the notifier to observer notifiers in cache: %v", err)
 				return
 			}
-			suoh.hub.Notifiers[notifier] = append(suoh.hub.Notifiers[notifier],
-				&models.SocketClient{
-					Conn:   ws,
-					UserId: observer,
-				},
-			)
+			suoh.hub.Notifiers[notifier] = append(suoh.hub.Notifiers[notifier], observer)
 		}
 	}
 }
@@ -288,78 +307,43 @@ func (souh *SocketUserObservingHandler) fetchObserverNotifiersFromCache(observer
 	return notifiers, nil
 }
 
-func (sch *SocketUserObservingHandler) handleIncommingMessagesWithEvent(ws *websocket.Conn, userInfo *models.Claims, conversationId uint) {
-	for {
-		// Read message from client
-		var event socketModels.SocketEvent
-		err := ws.ReadJSON(&event)
-		if err != nil {
-			log.Printf("Error reading json: %v", err)
-			sch.deleteDiconnectedClientFromConversation(userInfo.ID, conversationId)
-			break
-		}
-
-		// Set event conversation id
-		event.ConversationID = conversationId
-
-		// Handle event
-		switch event.Event {
-		case enums.SOCKET_EVENT_SEND_MESSAGE:
-			//
-		default:
-			log.Printf("Unknown event: %v", event)
-		}
-	}
-}
-
-func (suoh *SocketUserObservingHandler) HandleRedisMessages() {
-	ch := suoh.SubscribeToChannel(suoh.hub.Redis, "chat_channel")
+func (suoh *SocketUserObservingHandler) handleRedisMessages() {
+	ch := suoh.subscribeToChannel(suoh.hub.Redis, redisModels.REDIS_CHANNEL_OBSERVE)
 	for msg := range ch {
-		var redisMessage redisModels.RedisPublishedMessage
+		var redisMessage obsSocketModels.ObservingSocketEvent
 		if err := json.Unmarshal([]byte(msg.Payload), &redisMessage); err != nil {
 			log.Printf("Error unmarshalling message: %v", err)
 			continue
 		}
-		suoh.SendMessageToClient(redisMessage)
+		suoh.sendMessageToClient(redisMessage)
 	}
 }
 
-func (sch *SocketUserObservingHandler) HandleRedisMessages() {
-	ch := sch.SubscribeToChannel(sch.hub.Redis, "chat_channel")
-	for msg := range ch {
-		var redisMessage redisModels.RedisPublishedMessage
-		if err := json.Unmarshal([]byte(msg.Payload), &redisMessage); err != nil {
-			log.Printf("Error unmarshalling message: %v", err)
-			continue
-		}
-		sch.SendMessageToClient(redisMessage)
-	}
-}
+func (suoh *SocketUserObservingHandler) sendMessageToClient(redisMessage obsSocketModels.ObservingSocketEvent) {
+	suoh.mu.Lock()
+	defer suoh.mu.Unlock()
 
-func (sch *SocketUserObservingHandler) SendMessageToClient(redisMessage redisModels.RedisPublishedMessage) {
-	sch.mu.Lock()
-	defer sch.mu.Unlock()
-	if conversation, ok := sch.hub.Conversations[redisMessage.ConversationID]; ok {
-		for _, client := range conversation {
+	if notifier, ok := suoh.hub.Notifiers[redisMessage.Payload.UserId]; ok {
+		for _, client := range notifier {
 			if err := client.Conn.WriteJSON(redisMessage); err != nil {
 				log.Printf("Error writing json: %v", err)
 				err := client.Conn.Close()
 				if err != nil {
 					return
 				}
-				sch.deleteDiconnectedClientFromConversation(client.UserId, redisMessage.ConversationID)
+				suoh.unsubscribeObserverFromNotifiers(client.UserId)
 			}
 		}
 	}
 }
 
-func (sch *SocketUserObservingHandler) PublishMessage(redis *redis.Client, channel string, message []byte) error {
-	return redis.Publish(sch.ctx, channel, message).Err()
+func (suoh *SocketUserObservingHandler) publishMessage(redis *redis.Client, channel string, message []byte) error {
+	return redis.Publish(suoh.ctx, channel, message).Err()
 }
 
-func (sch *SocketUserObservingHandler) SubscribeToChannel(redis *redis.Client, channel string) <-chan *redis.Message {
-	pubsub := redis.Subscribe(sch.ctx, channel)
-	_, err := pubsub.Receive(sch.ctx)
+func (suoh *SocketUserObservingHandler) subscribeToChannel(redis *redis.Client, channel string) <-chan *redis.Message {
+	pubsub := redis.Subscribe(suoh.ctx, channel)
+	_, err := pubsub.Receive(suoh.ctx)
 	if err != nil {
 		log.Fatalf("Could not subscribe to channel: %v", err)
 	}

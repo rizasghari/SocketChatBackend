@@ -231,7 +231,7 @@ func (sch *SocketChatHandler) handleIsTypingEvent(payload json.RawMessage, event
 	}
 
 	log.Println("isTypingPayload: ", isTypingPayload)
-	
+
 	// Publish the new message to Redis
 	redisEvent := redisModels.RedisPublishedMessage{
 		Event:          event,
@@ -245,7 +245,7 @@ func (sch *SocketChatHandler) handleIsTypingEvent(payload json.RawMessage, event
 		return errors
 	}
 	log.Println("jsonEvent: ", string(jsonEvent))
-	if err := sch.PublishMessage(sch.hub.Redis, "chat_channel", jsonEvent); err != nil {
+	if err := sch.PublishMessage(sch.hub.Redis, redisModels.REDIS_CHANNEL_CHAT, jsonEvent); err != nil {
 		errors = append(errors, err)
 		return errors
 	}
@@ -286,7 +286,7 @@ func (sch *SocketChatHandler) handleSendMessageEvent(payload json.RawMessage, ev
 		errors = append(errors, err)
 		return errors
 	}
-	if err := sch.PublishMessage(sch.hub.Redis, "chat_channel", jsonEvent); err != nil {
+	if err := sch.PublishMessage(sch.hub.Redis, redisModels.REDIS_CHANNEL_CHAT, jsonEvent); err != nil {
 		errors = append(errors, err)
 		return errors
 	}
@@ -323,7 +323,7 @@ func (sch *SocketChatHandler) handleSeenMessageEvent(payload json.RawMessage, ev
 		errors = append(errors, err)
 		return errors
 	}
-	if err := sch.PublishMessage(sch.hub.Redis, "chat_channel", jsonEvent); err != nil {
+	if err := sch.PublishMessage(sch.hub.Redis, redisModels.REDIS_CHANNEL_CHAT, jsonEvent); err != nil {
 		errors = append(errors, err)
 		return errors
 	}
@@ -358,7 +358,7 @@ func (sch *SocketChatHandler) logConversations() {
 }
 
 func (sch *SocketChatHandler) HandleRedisMessages() {
-	ch := sch.SubscribeToChannel(sch.hub.Redis, "chat_channel")
+	ch := sch.SubscribeToChannel(sch.hub.Redis, redisModels.REDIS_CHANNEL_CHAT)
 	for msg := range ch {
 		var redisMessage redisModels.RedisPublishedMessage
 		if err := json.Unmarshal([]byte(msg.Payload), &redisMessage); err != nil {

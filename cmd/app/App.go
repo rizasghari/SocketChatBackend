@@ -45,10 +45,18 @@ func (app *App) LetsGo() {
 	fileManagerService := services.NewFileManagerService(minioService)
 
 	restHandler := handlers.NewRestandler(authService, chatService, fileManagerService)
-	socketHandler := handlers.NewSocketHandler(app.redis, app.ctx, chatService)
+	socketChatHandler := handlers.NewSocketChatHandler(app.redis, app.ctx, chatService)
 	htmlHandler := handlers.NewHtmlHandler(authService, chatService, fileManagerService)
+	socketObservingHandler := handlers.NewSocketUserObservingHandler(app.redis, app.ctx, authService)
 
-	http.NewHttpServer(app.ctx, app.redis, restHandler, socketHandler, htmlHandler).Run()
+	http.NewHttpServer(
+		app.ctx,
+		app.redis,
+		restHandler,
+		socketChatHandler,
+		socketObservingHandler,
+		htmlHandler,
+	).Run()
 }
 
 func (app *App) initializeRedis() {

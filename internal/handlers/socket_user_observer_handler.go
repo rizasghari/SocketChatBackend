@@ -10,6 +10,7 @@ import (
 	"socketChat/internal/enums"
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
+	socketModels "socketChat/internal/models/socket"
 	"socketChat/internal/models/socket/observing"
 	"socketChat/internal/msgs"
 	"socketChat/internal/utils"
@@ -73,20 +74,76 @@ func (suoh *SocketUserObservingHandler) HandleSocketUserObservingRoute(ctx *gin.
 		return
 	}
 
-	notifiers, err := suoh.retrieveNotifiers(ctx)
+	// Get operation
+	operation := ctx.Param("operation")
+	if operation == "" {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrObservingSocketOperationRequired},
+		})
+		return
+	}
+
+	// Upgrade HTTP connection to WebSocket
+	ws, err := suoh.upgradeHttpToWs(ctx)
 	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
 			Success: false,
 			Message: msgs.MsgOperationFailed,
 			Errors:  []error{err},
 		})
+		return
 	}
+	defer ws.Close()
 
-	suoh.HandleConnections(ctx, userInfo, notifiers)
+	switch operation {
+	case enums.OBS_SOCK_OP_SUBSCRIBE:
+		notifiers, err := suoh.retrieveNotifiersFromQuery(ctx)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
+				Success: false,
+				Message: msgs.MsgOperationFailed,
+				Errors:  []error{err},
+			})
+		}
+		suoh.handleSubsciption(ctx, ws, userInfo, notifiers)
+	case enums.OB_SOCK_OP_SET_STATUS:
+		status, err := suoh.retrieveStatusFromQuery(ctx)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
+				Success: false,
+				Message: msgs.MsgOperationFailed,
+				Errors:  []error{err},
+			})
+		}
+		suoh.handleSetOnlineStatus(ctx, ws, userInfo, status)
+	default:
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrInvalidObservingSocketOperation},
+		})
+		return
+	}
 }
 
-func (suoh *SocketUserObservingHandler) retrieveNotifiers(ctx *gin.Context) ([]uint, error) {
-	notifiersQuery := ctx.Query("subscribe")
+func (souh *SocketUserObservingHandler) retrieveStatusFromQuery(ctx *gin.Context) (string, error) {
+	statusQuery := ctx.Query("status")
+	if statusQuery == "" {
+		return "", errs.ErrObservingSocketStatusRequired
+	}
+	return statusQuery, nil
+}
+
+func (suoh *SocketUserObservingHandler) handleSetOnlineStatus(ctx *gin.Context, ws *websocket.Conn, userInfo *models.Claims, status string) {
+	// set user online status in db
+
+	// notify all observers
+}
+
+func (suoh *SocketUserObservingHandler) retrieveNotifiersFromQuery(ctx *gin.Context) ([]uint, error) {
+	notifiersQuery := ctx.Query("notifiers")
 	if notifiersQuery == "" {
 		return []uint{}, errs.ErrInvalidRequest
 	}
@@ -103,23 +160,18 @@ func (suoh *SocketUserObservingHandler) retrieveNotifiers(ctx *gin.Context) ([]u
 }
 
 func (suoh *SocketUserObservingHandler) StartUserObservingSocket() {
-	suoh.InitializeSocketUpgrader()
 	go suoh.HandleRedisMessages()
 }
 
-func (suoh *SocketUserObservingHandler) InitializeSocketUpgrader() {
+func (suoh *SocketUserObservingHandler) upgradeHttpToWs(ctx *gin.Context) (*websocket.Conn, error) {
 	suoh.upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
 		},
 	}
-}
-
-func (suoh *SocketUserObservingHandler) HandleConnections(ctx *gin.Context, userInfo *models.Claims, notifiers []uint) {
 	ws, err := suoh.upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
-		log.Printf("Failed to upgrade connection: %v", err)
-		return
+		return nil, err
 	}
 	defer func(ws *websocket.Conn) {
 		err := ws.Close()
@@ -127,6 +179,10 @@ func (suoh *SocketUserObservingHandler) HandleConnections(ctx *gin.Context, user
 			log.Printf("Error closing connection: %v", err)
 		}
 	}(ws)
+	return ws, nil
+}
+
+func (suoh *SocketUserObservingHandler) handleSubsciption(ctx *gin.Context, ws *websocket.Conn, userInfo *models.Claims, notifiers []uint) {
 
 	// unsubscribe from hub and notifiers if user disconnects
 	suoh.setObserverDisconnectedListener(&models.SocketClient{Conn: ws, UserId: userInfo.ID})
@@ -180,7 +236,9 @@ func (suoh *SocketUserObservingHandler) unsubscribeObserverFromNotifiers(observe
 		log.Println("Could not fetch observer notifiers from cache: %v", err)
 		return
 	}
-	if len(notifiers) == 0 {return}
+	if len(notifiers) == 0 {
+		return
+	}
 
 	// Remove observer from redis cache
 	err = suoh.hub.Redis.Del(suoh.ctx, fmt.Sprintf("observer_notifiers_%d", observer)).Err()

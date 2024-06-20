@@ -27,6 +27,10 @@ const (
 	ErrConversationNotFound = Error("conversation not found")
 	NoneOfMessagesSeen      = Error("none of messages seen")
 
+	ErrObservingSocketOperationRequired = Error("observing socket operation required")
+	ErrInvalidObservingSocketOperation = Error("invalid observing socket operation")
+	ErrObservingSocketStatusRequired = Error("observing socket status required")
+
 	ErrInvalidRequestBody = Error("invalid request body")
 	ErrUserAlreadyExists  = Error("user already exists")
 	ErrUserNotFound       = Error("user not found")

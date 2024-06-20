@@ -53,9 +53,13 @@ func (chr *ChatRepository) CreateConversation(conversationData *models.CreateCon
 		return nil, errors
 	}
 
-	conversationResponse := conversation.ToConversationResponse()
+	conversationFromDB, errs := chr.GetConversationById(conversation.ID)
 
-	return &conversationResponse, nil
+	if len(errs) > 0 {
+		return nil, errs
+	}
+
+	return conversationFromDB, nil
 }
 
 func (chr *ChatRepository) GetUserConversations(userID uint, page, size int) (*models.ConversationListResponse, []error) {
@@ -207,7 +211,7 @@ func (chr *ChatRepository) FindConversationBetweenTwoUsers(userID1, userID2 uint
 func (chr *ChatRepository) GetConversationById(conversationID uint) (*models.ConversationResponse, []error) {
 	var errors []error
 	var conversation models.Conversation
-	result := chr.db.Where("id = ?", conversationID).First(&conversation)
+	result := chr.db.Preload("Members").Where("id = ?", conversationID).First(&conversation)
 	if err := result.Error; err != nil {
 		errors = append(errors, err)
 		return nil, errors

@@ -92,7 +92,7 @@ func (suoh *SocketUserObservingHandler) HandleSocketUserObservingRoute(ctx *gin.
 		})
 		return
 	}
-	defer ws.Close()
+	// defer ws.Close()
 
 	// Set the user online status to online
 	suoh.setOnlineStatus(userInfo.ID, true)
@@ -284,10 +284,13 @@ func (suoh *SocketUserObservingHandler) handleRedisMessages() {
 }
 
 func (suoh *SocketUserObservingHandler) sendMessageToClient(redisMessage obsSocketModels.ObservingSocketEvent) {
+	log.Printf("Sending message to notifier observers. Notifier: %v", redisMessage.Payload.UserId)
 	suoh.mu.Lock()
 	defer suoh.mu.Unlock()
 	if notifier, ok := suoh.hub.Notifiers[redisMessage.Payload.UserId]; ok {
+		log.Printf("Found notifier %v", redisMessage.Payload.UserId)
 		for _, client := range notifier {
+			log.Printf("Found observer %v", client.UserId)
 			if err := client.Conn.WriteJSON(redisMessage); err != nil {
 				log.Printf("Error writing json: %v", err)
 				err := client.Conn.Close()
@@ -301,6 +304,7 @@ func (suoh *SocketUserObservingHandler) sendMessageToClient(redisMessage obsSock
 }
 
 func (suoh *SocketUserObservingHandler) publishMessage(redis *redis.Client, channel string, message []byte) error {
+	log.Printf("Publishing message to channel %v with message %v", channel, string(message))
 	return redis.Publish(suoh.ctx, channel, message).Err()
 }
 

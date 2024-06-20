@@ -99,14 +99,9 @@ func (suoh *SocketUserObservingHandler) HandleSocketUserObservingRoute(ctx *gin.
 
 	// Subscribe to notifiers
 	notifiers, err := suoh.retrieveNotifiersFromQuery(ctx)
-	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
-			Success: false,
-			Message: msgs.MsgOperationFailed,
-			Errors:  []error{err},
-		})
-	}
-	suoh.handleSubscription(ws, userInfo, notifiers)
+	if err == nil && len(notifiers) > 0 {
+		suoh.handleSubscription(ws, userInfo, notifiers)
+	} 
 }
 
 func (suoh *SocketUserObservingHandler) setOnlineStatus(userId uint, status bool) {

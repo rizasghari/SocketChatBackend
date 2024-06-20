@@ -118,7 +118,7 @@ func (suoh *SocketUserObservingHandler) keepSocketAlive(ws *websocket.Conn, user
 		err := ws.ReadJSON(&event)
 		if err != nil {
 			log.Printf("Error reading json: %v", err)
-			suoh.unsubscribeObserverFromNotifiers(userId)
+			suoh.unsubscribe(userId)
 			break
 		}
 		// Handle event
@@ -150,7 +150,7 @@ func (suoh *SocketUserObservingHandler) setOnlineStatus(userId uint, status bool
 		return
 	}
 	log.Println("setOnlineStatus jsonEvent: ", string(jsonEvent))
-	if err := suoh.publishMessage(suoh.hub.Redis, redisModels.REDIS_CHANNEL_OBSERVE, jsonEvent); err != nil {
+	if err := suoh.publish(suoh.hub.Redis, redisModels.REDIS_CHANNEL_OBSERVE, jsonEvent); err != nil {
 		log.Println("failed to publish message: ", err)
 		return
 	}
@@ -192,22 +192,18 @@ func (suoh *SocketUserObservingHandler) handleSubscription(ws *websocket.Conn, u
 		Conn:   ws,
 		UserId: userInfo.ID,
 	}
-
-	// Add observer to observing notifiers and subscribe to hub
-	suoh.subscribeObserverToNotifiers(observer, notifiers)
-
-	// unsubscribe from hub and notifiers if user disconnects
-	suoh.setObserverDisconnectionListener(observer)
+	suoh.subscribe(observer, notifiers)
+	suoh.handleDisconnection(observer)
 }
 
-func (sch *SocketUserObservingHandler) setObserverDisconnectionListener(observer *models.SocketClient) {
+func (suoh *SocketUserObservingHandler) handleDisconnection(observer *models.SocketClient) {
 	observer.Conn.SetCloseHandler(func(code int, text string) error {
-		sch.unsubscribeObserverFromNotifiers(observer.UserId)
+		suoh.unsubscribe(observer.UserId)
 		return nil
 	})
 }
 
-func (suoh *SocketUserObservingHandler) subscribeObserverToNotifiers(observer *models.SocketClient, notifiersToObserve []uint) {
+func (suoh *SocketUserObservingHandler) subscribe(observer *models.SocketClient, notifiersToObserve []uint) {
 	suoh.mu.Lock()
 	defer suoh.mu.Unlock()
 	for _, notifier := range notifiersToObserve {
@@ -216,7 +212,8 @@ func (suoh *SocketUserObservingHandler) subscribeObserverToNotifiers(observer *m
 			suoh.hub.Notifiers[notifier] = []*models.SocketClient{}
 		}
 		// Add observer to notifier if not observing yet and save it in redis cache
-		if observing := slices.Contains(suoh.hub.Notifiers[notifier], &models.SocketClient{Conn: observer.Conn, UserId: observer.UserId}); !observing {
+		if observing := slices.Contains(suoh.hub.Notifiers[notifier],
+			&models.SocketClient{Conn: observer.Conn, UserId: observer.UserId}); !observing {
 			err := suoh.saveObserverNotifiersInCache(observer.UserId, notifier)
 			if err != nil {
 				log.Fatalf("Could not add the notifier to observer notifiers in cache: %v", err)
@@ -227,10 +224,9 @@ func (suoh *SocketUserObservingHandler) subscribeObserverToNotifiers(observer *m
 	}
 }
 
-func (suoh *SocketUserObservingHandler) unsubscribeObserverFromNotifiers(observer uint) {
+func (suoh *SocketUserObservingHandler) unsubscribe(observer uint) {
 	suoh.mu.Lock()
 	defer suoh.mu.Unlock()
-
 	// set the observer offline
 	suoh.setOnlineStatus(observer, false)
 
@@ -300,11 +296,11 @@ func (suoh *SocketUserObservingHandler) handleRedisMessages() {
 			log.Printf("Error unmarshalling message: %v", err)
 			continue
 		}
-		suoh.sendMessageToClient(redisMessage)
+		suoh.send(redisMessage)
 	}
 }
 
-func (suoh *SocketUserObservingHandler) sendMessageToClient(redisMessage obsSocketModels.ObservingSocketEvent) {
+func (suoh *SocketUserObservingHandler) send(redisMessage obsSocketModels.ObservingSocketEvent) {
 	log.Printf("Sending message to notifier observers. Notifier: %v", redisMessage.Payload.UserId)
 	suoh.mu.Lock()
 	defer suoh.mu.Unlock()
@@ -318,13 +314,13 @@ func (suoh *SocketUserObservingHandler) sendMessageToClient(redisMessage obsSock
 				if err != nil {
 					return
 				}
-				suoh.unsubscribeObserverFromNotifiers(client.UserId)
+				suoh.unsubscribe(client.UserId)
 			}
 		}
 	}
 }
 
-func (suoh *SocketUserObservingHandler) publishMessage(redis *redis.Client, channel string, message []byte) error {
+func (suoh *SocketUserObservingHandler) publish(redis *redis.Client, channel string, message []byte) error {
 	log.Printf("Publishing message to channel %v with message %v", channel, string(message))
 	return redis.Publish(suoh.ctx, channel, message).Err()
 }

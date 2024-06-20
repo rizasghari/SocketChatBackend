@@ -92,7 +92,12 @@ func (suoh *SocketUserObservingHandler) HandleSocketUserObservingRoute(ctx *gin.
 		})
 		return
 	}
-	// defer ws.Close()
+	defer func(ws *websocket.Conn) {
+		err := ws.Close()
+		if err != nil {
+			log.Printf("Error closing connection: %v", err)
+		}
+	}(ws)
 
 	// Set the user online status to online
 	suoh.setOnlineStatus(userInfo.ID, true)
@@ -101,7 +106,29 @@ func (suoh *SocketUserObservingHandler) HandleSocketUserObservingRoute(ctx *gin.
 	notifiers, err := suoh.retrieveNotifiersFromQuery(ctx)
 	if err == nil && len(notifiers) > 0 {
 		suoh.handleSubscription(ws, userInfo, notifiers)
-	} 
+	}
+
+	suoh.keepSocketAlive(ws, userInfo.ID)
+}
+
+func (suoh *SocketUserObservingHandler) keepSocketAlive(ws *websocket.Conn, userId uint) {
+	for {
+		// Read message from client
+		var event obsSocketModels.ObservingSocketEvent
+		err := ws.ReadJSON(&event)
+		if err != nil {
+			log.Printf("Error reading json: %v", err)
+			suoh.unsubscribeObserverFromNotifiers(userId)
+			break
+		}
+		// Handle event
+		switch event.Event {
+		case enums.SOCKET_EVENT_NOTIFY:
+			log.Printf("Received notify event: %v", event)
+		default:
+			log.Printf("Unknown event: %v", event)
+		}
+	}
 }
 
 func (suoh *SocketUserObservingHandler) setOnlineStatus(userId uint, status bool) {
@@ -111,8 +138,8 @@ func (suoh *SocketUserObservingHandler) setOnlineStatus(userId uint, status bool
 	redisEvent := obsSocketModels.ObservingSocketEvent{
 		Event: enums.SOCKET_EVENT_NOTIFY,
 		Payload: obsSocketModels.ObservingSocketPayload{
-			UserId:   userId,
-			IsOnline: status,
+			UserId:     userId,
+			IsOnline:   status,
 			LastSeenAt: nil,
 		},
 	}
@@ -157,12 +184,6 @@ func (suoh *SocketUserObservingHandler) upgradeHttpToWs(ctx *gin.Context) (*webs
 	if err != nil {
 		return nil, err
 	}
-	defer func(ws *websocket.Conn) {
-		err := ws.Close()
-		if err != nil {
-			log.Printf("Error closing connection: %v", err)
-		}
-	}(ws)
 	return ws, nil
 }
 

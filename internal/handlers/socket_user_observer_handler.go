@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -52,32 +53,12 @@ func NewSocketUserObservingHandler(
 
 func (suoh *SocketUserObservingHandler) HandleSocketUserObservingRoute(ctx *gin.Context) {
 	// Authenticate user
-	jwtToken := ctx.Request.Header.Get("Authorization")
-	if jwtToken == "" {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
-			Success: false,
-			Message: msgs.MsgOperationFailed,
-			Errors:  []error{errs.ErrUnauthorized},
-		})
-		return
-	}
-	userInfo, err := utils.VerifyToken(jwtToken)
+	userInfo, err := suoh.authorize(ctx)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
 			Success: false,
 			Message: msgs.MsgOperationFailed,
-			Errors:  []error{errs.ErrUnauthorized},
-		})
-		return
-	}
-
-	// Validate user
-	// Todo: Validate user in proper way
-	if userInfo.ID == 0 {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
-			Success: false,
-			Message: msgs.MsgOperationFailed,
-			Errors:  []error{errs.ErrUnauthorized},
+			Errors:  []error{err},
 		})
 		return
 	}
@@ -108,31 +89,54 @@ func (suoh *SocketUserObservingHandler) HandleSocketUserObservingRoute(ctx *gin.
 		suoh.handleSubscription(ws, userInfo, notifiers)
 	}
 
+	// Keep socket alive to notify user
 	suoh.keepSocketAlive(ws, userInfo.ID)
+}
+
+func (souh *SocketUserObservingHandler) authorize(ctx *gin.Context) (*models.Claims, error) {
+	// Authenticate user
+	jwtToken := ctx.Request.Header.Get("Authorization")
+	if jwtToken == "" {
+		return nil, errs.ErrUnauthorized
+	}
+	userInfo, err := utils.VerifyToken(jwtToken)
+	if err != nil {
+		return nil, err
+	}
+	return userInfo, nil
 }
 
 func (suoh *SocketUserObservingHandler) keepSocketAlive(ws *websocket.Conn, userId uint) {
 	for {
-		// Read message from client
-		var event obsSocketModels.ObservingSocketEvent
-		err := ws.ReadJSON(&event)
+		var buf bytes.Buffer
+		err := ws.ReadJSON(&buf)
 		if err != nil {
-			log.Printf("Error reading json: %v", err)
-			suoh.unsubscribe(userId)
-			break
+			log.Printf("Error reading json from user %v: %v", userId, err)
+			continue
 		}
-		// Handle event
-		switch event.Event {
-		case enums.SOCKET_EVENT_NOTIFY:
-			log.Printf("Received notify event: %v", event)
-		default:
-			log.Printf("Unknown event: %v", event)
-		}
+		log.Println("keepSocketAlive buf: ", buf.String())
 	}
 }
 
 func (suoh *SocketUserObservingHandler) setOnlineStatus(userId uint, status bool) {
 	// set user online status in db
+	isOnline, lastSeen, err := suoh.authService.GetUserOnlineStatus(userId)
+	if err != nil {
+		log.Printf("Error while fetching user %v online status from db: %v", userId, err)
+	}
+	log.Printf("User %v previous online status: %v - last seen: %v", userId, isOnline, lastSeen)
+
+	err = suoh.authService.SetUserOnlineStatus(userId, status)
+	if err != nil {
+		log.Printf("failed to set user %v online status in db: %v", userId, err)
+		return 
+	}
+
+	isOnline, lastSeen, err = suoh.authService.GetUserOnlineStatus(userId)
+	if err != nil {
+		log.Printf("Error while fetching user %v online status from db: %v", userId, err)
+	}
+	log.Printf("User %v current online status: %v - last seen: %v", userId, isOnline, lastSeen)
 
 	// Publish the new event to Redis
 	redisEvent := obsSocketModels.ObservingSocketEvent{

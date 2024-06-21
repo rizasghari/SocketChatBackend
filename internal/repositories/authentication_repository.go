@@ -5,6 +5,7 @@ import (
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
 	"socketChat/internal/utils"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -54,7 +55,7 @@ func (ar *AuthenticationRepository) Login(login *models.LoginRequestBody) (*mode
 		errors = append(errors, errs.ErrWrongPassword)
 		return nil, "", errors
 	}
-	
+
 	return user.ToUserResponse(), user.Email, nil
 }
 
@@ -210,4 +211,35 @@ func (ar *AuthenticationRepository) GetUserProfile(id int) (*models.ProfileRespo
 		return nil, errors
 	}
 	return user.ToProfileResponse(), nil
+}
+
+func (ar *AuthenticationRepository) SetUserOnlineStatus(userID uint, status bool) error {
+	result := ar.db.Model(&models.User{}).
+		Where("id = ?", userID).
+		Updates(map[string]any{
+			"is_online": status,
+			"last_seen": time.Now(),
+		})
+	if err := result.Error; err != nil {
+		return err
+	}
+	if result.RowsAffected == 0 {
+		return errs.ErrUserNotFound
+	}
+	return nil
+}
+
+func (ar *AuthenticationRepository) GetUserOnlineStatus(userID uint) (bool, *time.Time, error) {
+	var user models.User
+	result := ar.db.Select("is_online", "last_seen").
+		Where("id = ?", userID).
+		First(&user)
+
+	if err := result.Error; err != nil {
+		return false, nil, err
+	}
+	if result.RowsAffected == 0 {
+		return false, nil, errs.ErrUserNotFound
+	}
+	return user.IsOnline, user.LastSeen, nil
 }

@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -190,10 +189,12 @@ func (sch *SocketChatHandler) handleIncommingMessagesWithEvent(ws *websocket.Con
 		// Read message from client
 		var event socketModels.SocketEvent
 		err := ws.ReadJSON(&event)
-		if err != nil && err == io.EOF {
+		if err != nil {
+			if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
+				sch.deleteDiconnectedClientFromConversation(userInfo.ID, conversationId)
+				break
+			}
 			log.Printf("Error reading json: %v", err)
-			sch.deleteDiconnectedClientFromConversation(userInfo.ID, conversationId)
-			break
 		}
 
 		// Set event conversation id

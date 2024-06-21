@@ -174,7 +174,7 @@ func (suoh *SocketUserObservingHandler) setOnlineStatus(userId uint, status bool
 }
 
 func (suoh *SocketUserObservingHandler) updateUserOnlineStatusInCache(userID uint, status bool, lastSeen time.Time) error {
-	expirationDuration := time.Duration(time.Hour.Hours() * 24)
+	expirationDuration := time.Duration(time.Hour * 24)
 
 	// Save online status
 	statusKey := fmt.Sprintf("user_online_status_%v", userID)
@@ -200,12 +200,20 @@ func (suoh *SocketUserObservingHandler) updateUserOnlineStatusInCache(userID uin
 }
 
 func (suoh *SocketUserObservingHandler) fetchUserOnlineStatusFromCache(userID uint) (bool, *time.Time, error) {
+	// Get online status
 	statusKey := fmt.Sprintf("user_online_status_%v", userID)
 	statusStr, err := suoh.hub.Redis.Get(suoh.ctx, statusKey).Result()
 	if err != nil {
 		return false, nil, err
 	}
+	var status bool
+	if statusStr == "true" {
+		status = true
+	} else {
+		status = false
+	}
 
+	// Get last seen
 	lastSeenKey := fmt.Sprintf("user_last_seen_%v", userID)
 	lastSeenStr, err := suoh.hub.Redis.Get(suoh.ctx, lastSeenKey).Result()
 	if err != nil {
@@ -214,14 +222,6 @@ func (suoh *SocketUserObservingHandler) fetchUserOnlineStatusFromCache(userID ui
 	lastSeen, err := utils.StrToTime(lastSeenStr)
 	if  err != nil {
 		return false, nil, err
-	}
-
-
-	var status bool
-	if statusStr == "true" {
-		status = true
-	} else {
-		status = false
 	}
 
 	return status, lastSeen, nil

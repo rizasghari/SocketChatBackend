@@ -295,11 +295,9 @@ func (suoh *SocketUserObservingHandler) subscribe(observer *models.SocketClient,
 }
 
 func (suoh *SocketUserObservingHandler) unsubscribe(observer uint) {
-	suoh.mu.Lock()
-	defer suoh.mu.Unlock()
 	// set the observer offline
 	suoh.setOnlineStatus(observer, false)
-
+	
 	// Fetch observer notifiers from cache
 	notifiers, err := suoh.fetchObserverNotifiersFromCache(observer)
 	if err != nil {
@@ -318,6 +316,7 @@ func (suoh *SocketUserObservingHandler) unsubscribe(observer uint) {
 		return
 	}
 
+	suoh.mu.Lock()
 	// Remove observer from notifiers
 	for _, notifier := range notifiers {
 		for i, client := range suoh.hub.Notifiers[notifier] {
@@ -331,6 +330,7 @@ func (suoh *SocketUserObservingHandler) unsubscribe(observer uint) {
 			delete(suoh.hub.Notifiers, notifier)
 		}
 	}
+	suoh.mu.Unlock()
 }
 
 func (suoh *SocketUserObservingHandler) saveObserverNotifiersInCache(observer uint, notifier uint) error {

@@ -213,20 +213,21 @@ func (ar *AuthenticationRepository) GetUserProfile(id int) (*models.ProfileRespo
 	return user.ToProfileResponse(), nil
 }
 
-func (ar *AuthenticationRepository) SetUserOnlineStatus(userID uint, status bool) error {
+func (ar *AuthenticationRepository) SetUserOnlineStatus(userID uint, status bool) (bool, *time.Time, error) {
+	lastSeen := time.Now()
 	result := ar.db.Model(&models.User{}).
 		Where("id = ?", userID).
 		Updates(map[string]any{
 			"is_online": status,
-			"last_seen": time.Now(),
+			"last_seen": lastSeen,
 		})
 	if err := result.Error; err != nil {
-		return err
+		return false, nil, err
 	}
 	if result.RowsAffected == 0 {
-		return errs.ErrUserNotFound
+		return false, nil, errs.ErrUserNotFound
 	}
-	return nil
+	return status, &lastSeen, nil
 }
 
 func (ar *AuthenticationRepository) GetUserOnlineStatus(userID uint) (bool, *time.Time, error) {

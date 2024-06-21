@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -111,6 +112,10 @@ func (suoh *SocketUserObservingHandler) keepSocketAlive(ws *websocket.Conn, user
 		var buf bytes.Buffer
 		err := ws.ReadJSON(&buf)
 		if err != nil {
+			if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
+				suoh.unsubscribe(userId)
+				break
+			}
 			log.Printf("Error reading json from user %v: %v", userId, err)
 			continue
 		}
@@ -126,17 +131,25 @@ func (suoh *SocketUserObservingHandler) setOnlineStatus(userId uint, status bool
 	}
 	log.Printf("User %v previous online status: %v - last seen: %v", userId, isOnline, lastSeen)
 
-	err = suoh.authService.SetUserOnlineStatus(userId, status)
+	isOnline, lastSeen, err = suoh.authService.SetUserOnlineStatus(userId, status)
 	if err != nil {
 		log.Printf("failed to set user %v online status in db: %v", userId, err)
-		return 
-	}
-
-	isOnline, lastSeen, err = suoh.authService.GetUserOnlineStatus(userId)
-	if err != nil {
-		log.Printf("Error while fetching user %v online status from db: %v", userId, err)
+		return
 	}
 	log.Printf("User %v current online status: %v - last seen: %v", userId, isOnline, lastSeen)
+
+	// Update user online status in cache
+	err = suoh.updateUserOnlineStatusInCache(userId, status, *lastSeen)
+	if err != nil {
+		log.Printf("Error while updating user %v online status on cache: %v", userId, err)
+	} else {
+		status, lseen, err := suoh.fetchUserOnlineStatusFromCache(userId)
+		if err != nil {
+			log.Printf("Error while fetching user %v online status from cache: %v", userId, err)
+		}
+		log.Printf("User %v online status from cache: %v - %v", userId, status, lseen)
+
+	}
 
 	// Publish the new event to Redis
 	redisEvent := obsSocketModels.ObservingSocketEvent{
@@ -158,6 +171,60 @@ func (suoh *SocketUserObservingHandler) setOnlineStatus(userId uint, status bool
 		log.Println("failed to publish message: ", err)
 		return
 	}
+}
+
+func (suoh *SocketUserObservingHandler) updateUserOnlineStatusInCache(userID uint, status bool, lastSeen time.Time) error {
+	expirationDuration := time.Duration(time.Hour.Hours() * 24)
+
+	// Save online status
+	statusKey := fmt.Sprintf("user_online_status_%v", userID)
+	var statusValue string
+	if status {
+		statusValue = "true"
+	} else {
+		statusValue = "false"
+	}
+	result := suoh.hub.Redis.Set(suoh.ctx, statusKey, statusValue, expirationDuration)
+	if result.Err() != nil {
+		return result.Err()
+	}
+
+	// Save last seen
+	lastSeenKey := fmt.Sprintf("user_last_seen_%v", userID)
+	result = suoh.hub.Redis.Set(suoh.ctx, lastSeenKey, lastSeen, expirationDuration)
+	if result.Err() != nil {
+		return result.Err()
+	}
+
+	return nil
+}
+
+func (suoh *SocketUserObservingHandler) fetchUserOnlineStatusFromCache(userID uint) (bool, *time.Time, error) {
+	statusKey := fmt.Sprintf("user_online_status_%v", userID)
+	statusStr, err := suoh.hub.Redis.Get(suoh.ctx, statusKey).Result()
+	if err != nil {
+		return false, nil, err
+	}
+
+	lastSeenKey := fmt.Sprintf("user_last_seen_%v", userID)
+	lastSeenStr, err := suoh.hub.Redis.Get(suoh.ctx, lastSeenKey).Result()
+	if err != nil {
+		return false, nil, err
+	}
+	lastSeen, err := utils.StrToTime(lastSeenStr)
+	if  err != nil {
+		return false, nil, err
+	}
+
+
+	var status bool
+	if statusStr == "true" {
+		status = true
+	} else {
+		status = false
+	}
+
+	return status, lastSeen, nil
 }
 
 func (suoh *SocketUserObservingHandler) retrieveNotifiersFromQuery(ctx *gin.Context) ([]uint, error) {

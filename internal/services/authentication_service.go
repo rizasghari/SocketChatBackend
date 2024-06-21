@@ -149,7 +149,7 @@ func (as *AuthenticationService) GetUserProfile(userID uint) (*models.ProfileRes
 	return as.authRepo.GetUserProfile(int(userID))
 }
 
-func (as *AuthenticationService) SetUserOnlineStatus(userID uint, status bool) error {
+func (as *AuthenticationService) SetUserOnlineStatus(userID uint, status bool) (bool, *time.Time, error) {
 	return as.authRepo.SetUserOnlineStatus(userID, status)
 }
 

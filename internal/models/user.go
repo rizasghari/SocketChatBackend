@@ -15,7 +15,7 @@ type User struct {
 	PasswordHash string     `gorm:"not null" json:"-"`
 	Password     string     `gorm:"-" json:"password"`
 	IsOnline     bool       `gorm:"default:false" json:"is_online"`
-	LastSeen     *time.Time `json:"last_seen"`
+	LastSeen     *time.Time `json:"last_seen_at"`
 }
 
 func (user *User) ToUserResponse() *UserResponse {

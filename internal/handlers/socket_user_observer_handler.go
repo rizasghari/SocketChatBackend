@@ -148,7 +148,6 @@ func (suoh *SocketUserObservingHandler) setOnlineStatus(userId uint, status bool
 			log.Printf("Error while fetching user %v online status from cache: %v", userId, err)
 		}
 		log.Printf("User %v online status from cache: %v - %v", userId, status, lseen)
-
 	}
 
 	// Publish the new event to Redis
@@ -157,7 +156,7 @@ func (suoh *SocketUserObservingHandler) setOnlineStatus(userId uint, status bool
 		Payload: obsSocketModels.ObservingSocketPayload{
 			UserId:     userId,
 			IsOnline:   status,
-			LastSeenAt: nil,
+			LastSeenAt: lastSeen,
 		},
 	}
 
@@ -220,7 +219,7 @@ func (suoh *SocketUserObservingHandler) fetchUserOnlineStatusFromCache(userID ui
 		return false, nil, err
 	}
 	lastSeen, err := utils.StrToTime(lastSeenStr)
-	if  err != nil {
+	if err != nil {
 		return false, nil, err
 	}
 
@@ -310,6 +309,7 @@ func (suoh *SocketUserObservingHandler) unsubscribe(observer uint) {
 	if len(notifiers) == 0 {
 		return
 	}
+	log.Printf("unsubscribe - fetchObserverNotifiersFromCache for observer %v: %v", observer, notifiers)
 
 	// Remove observer from redis cache
 	err = suoh.hub.Redis.Del(suoh.ctx, fmt.Sprintf("observer_notifiers_%d", observer)).Err()
@@ -367,6 +367,7 @@ func (suoh *SocketUserObservingHandler) handleRedisMessages() {
 			log.Printf("Error unmarshalling message: %v", err)
 			continue
 		}
+		log.Println("handleRedisMessages New redis message received")
 		suoh.send(redisMessage)
 	}
 }
@@ -377,17 +378,23 @@ func (suoh *SocketUserObservingHandler) send(redisMessage obsSocketModels.Observ
 	defer suoh.mu.Unlock()
 	if notifier, ok := suoh.hub.Notifiers[redisMessage.Payload.UserId]; ok {
 		log.Printf("Found notifier %v", redisMessage.Payload.UserId)
-		for _, client := range notifier {
-			log.Printf("Found observer %v", client.UserId)
-			if err := client.Conn.WriteJSON(redisMessage); err != nil {
-				log.Printf("Error writing json: %v", err)
-				err := client.Conn.Close()
-				if err != nil {
-					return
+		if len(notifier) > 0 {
+			for _, client := range notifier {
+				log.Printf("Found observer %v", client.UserId)
+				if err := client.Conn.WriteJSON(redisMessage); err != nil {
+					log.Printf("Error writing json: %v", err)
+					err := client.Conn.Close()
+					if err != nil {
+						return
+					}
+					suoh.unsubscribe(client.UserId)
 				}
-				suoh.unsubscribe(client.UserId)
 			}
+		} else {
+			log.Printf("Notifier %v doesn't have any subscribed observers", redisMessage.Payload.UserId)
 		}
+	} else {
+		log.Printf("No notifier found with %v key", redisMessage.Payload.UserId)
 	}
 }
 
@@ -397,6 +404,7 @@ func (suoh *SocketUserObservingHandler) publish(redis *redis.Client, channel str
 }
 
 func (suoh *SocketUserObservingHandler) subscribeToChannel(redis *redis.Client, channel string) <-chan *redis.Message {
+	log.Printf("Subscribing to redis channel %v", channel)
 	pubsub := redis.Subscribe(suoh.ctx, channel)
 	_, err := pubsub.Receive(suoh.ctx)
 	if err != nil {

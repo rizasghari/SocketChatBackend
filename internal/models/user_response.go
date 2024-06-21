@@ -8,5 +8,5 @@ type UserResponse struct {
 	LastName     string     `json:"last_name"`
 	ProfilePhoto *string    `json:"profile_photo"`
 	IsOnline     bool       `json:"is_online"`
-	LastSeen     *time.Time `json:"last_seen"`
+	LastSeen     *time.Time `json:"last_seen_at"`
 }

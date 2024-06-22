@@ -93,8 +93,8 @@ func (chr *ChatRepository) GetUserConversations(userID uint, page, size int) (*m
 	}
 
 	for _, conversation := range conversations {
-		conversationResponses = append(conversationResponses, conversation.ToConversationResponse())
-
+		lastMessaege, _ := chr.GetConversationLastMessage(conversation.ID)
+		conversationResponses = append(conversationResponses, conversation.ToConversationResponse(lastMessaege))
 	}
 
 	return &models.ConversationListResponse{
@@ -107,12 +107,32 @@ func (chr *ChatRepository) GetUserConversations(userID uint, page, size int) (*m
 
 func (chr *ChatRepository) SaveMessage(message *models.Message) (*models.Message, []error) {
 	var errors []error
-	if err := chr.db.Create(message).Error; err != nil {
-		errors = append(errors, err)
+	transactionErr := chr.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(message).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&models.Conversation{}).
+			Where("id = ?", message.ConversationID).
+			Update("updated_at", time.Now()).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if transactionErr != nil {
+		errors = append(errors, transactionErr)
 		return nil, errors
 	}
-
 	return message, nil
+}
+
+func (chr *ChatRepository) GetConversationLastMessage(conversationID uint) (*models.Message, error) {
+	var message models.Message
+	if err := chr.db.
+		Where("conversation_id = ?", conversationID).
+		Last(&message).Error; err != nil {
+		return nil, err
+	}
+	return &message, nil
 }
 
 func (chr *ChatRepository) GetMessagesByConversationId(conversationID uint, page, size int) (*models.MessageListResponse, []error) {
@@ -220,6 +240,7 @@ func (chr *ChatRepository) GetConversationById(conversationID uint) (*models.Con
 		errors = append(errors, errs.ErrConversationNotFound)
 		return nil, errors
 	}
-	conversationResponse := conversation.ToConversationResponse()
+	lastMessaege, _ := chr.GetConversationLastMessage(conversation.ID)
+	conversationResponse := conversation.ToConversationResponse(lastMessaege)
 	return &conversationResponse, nil
 }

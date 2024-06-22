@@ -1,6 +1,8 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+)
 
 type Conversation struct {
 	gorm.Model
@@ -9,14 +11,15 @@ type Conversation struct {
 	Messages []Message `json:"messages"`
 }
 
-func (conversation *Conversation) ToConversationResponse() ConversationResponse {
+func (conversation *Conversation) ToConversationResponse(lastMessage *Message) ConversationResponse {
 	members := []*UserResponse{}
 	for _, member := range conversation.Members {
 		members = append(members, member.ToUserResponse())
 	}
 	return ConversationResponse{
-		ID:      conversation.ID,
-		Type:    conversation.Type,
-		Members: members,
+		ID:          conversation.ID,
+		Type:        conversation.Type,
+		Members:     members,
+		LastMessage: lastMessage,
 	}
 }

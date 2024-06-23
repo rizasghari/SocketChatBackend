@@ -54,3 +54,7 @@ func (cs *ChatService) SeenMessage(messageIds []uint, seenerId uint) []error {
 	}
 	return cs.chatRepo.SeenMessage(messageIds, seenerId)
 }
+
+func (cs *ChatService) GetConversationUnReadMessagesForUser(conversationID, userID uint) (int, error) {
+	return cs.chatRepo.GetConversationUnReadMessagesForUser(conversationID, userID)
+}

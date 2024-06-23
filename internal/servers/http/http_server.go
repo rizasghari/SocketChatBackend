@@ -106,6 +106,7 @@ func (hs *HttpServer) setupRestfulRoutes() {
 		authenticated.POST("/conversations", hs.restHandler.CreateConversation)
 		authenticated.GET("/conversations/user/:id", hs.restHandler.GetUserConversations)
 		authenticated.GET("/conversations/my", hs.restHandler.GetUserConversationsByToken)
+		authenticated.GET("/conversations/unread/:id", hs.restHandler.GetConversationUnReadMessagesForUser)
 
 		authenticated.POST("/messages", hs.restHandler.SaveMessage)
 		authenticated.GET("/messages/conversation/:id", hs.restHandler.GetMessagesByConversationID)

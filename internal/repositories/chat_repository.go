@@ -198,6 +198,21 @@ func (chr *ChatRepository) SeenMessage(messageIds []uint, seenerId uint) []error
 	return nil
 }
 
+func (chr *ChatRepository) GetConversationUnReadMessagesForUser(conversationID, userID uint) (int, error) {
+	var count int = 0
+	result := chr.db.Raw(
+		"SELECT COUNT(*) FROM messages WHERE conversation_id = ? AND sender_id <> ? AND seen_at = NULL",
+		conversationID,
+		userID,
+	).Scan(&count)
+
+	if err := result.Error; err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 func (chr *ChatRepository) FindConversationBetweenTwoUsers(userID1, userID2 uint) (uint, []error) {
 	var errors []error
 

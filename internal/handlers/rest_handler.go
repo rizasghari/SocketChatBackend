@@ -557,3 +557,44 @@ func (rh *RestHandler) GetUserProfile(ctx *gin.Context) {
 		Data:    profile,
 	})
 }
+
+func (rh *RestHandler) GetConversationUnReadMessagesForUser(ctx *gin.Context) {
+	userID := utils.GetUserIdFromContext(ctx)
+	conversationID := ctx.Param("id")
+
+	if conversationID == "" {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrInvalidParams},
+		})
+		return
+	}
+
+	conversationIDInt, err := strconv.Atoi(conversationID)
+	if err != nil || conversationIDInt < 1 {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{errs.ErrInvalidParams},
+		})
+		return
+	}
+
+	count, err := rh.chatService.GetConversationUnReadMessagesForUser(uint(conversationIDInt), userID)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{err},
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, models.Response{
+		Success: true,
+		Message: msgs.MsgOperationSuccessful,
+		Data:    count,
+	})
+	
+}

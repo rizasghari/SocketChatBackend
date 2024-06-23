@@ -54,7 +54,7 @@ func (as *AuthenticationService) Login(loginData *models.LoginRequestBody) (*mod
 		return nil, errors
 	}
 
-	jwtExpiration := time.Now().Add(time.Duration(as.config.Viper.GetInt("jwt.expiration_time")) * time.Hour).Unix()
+	jwtExpiration := time.Now().Add(time.Duration(as.config.Viper.GetInt("jwt.expiration_time")) * time.Minute).Unix()
 	token, jwtErr := utils.CreateJwtToken(
 		user.ID,
 		email,

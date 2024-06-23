@@ -5,4 +5,5 @@ type ConversationResponse struct {
 	Type        string          `json:"type"`
 	Members     []*UserResponse `json:"members"`
 	LastMessage *Message        `json:"last_message"`
+	Unread      int            `json:"unread"`
 }

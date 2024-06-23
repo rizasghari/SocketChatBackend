@@ -170,7 +170,7 @@ func (ar *AuthenticationRepository) GetNotContactedYetUsers(userID uint, page, s
 	result := ar.db.Table("users").
 		Scopes(utils.Paginate(page, size)).
 		Where("id NOT IN (?)", subQuery).
-		Order("created_at DESC").
+		Order("is_online DESC").
 		Find(&users)
 
 	if err := result.Error; err != nil {

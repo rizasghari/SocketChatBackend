@@ -94,7 +94,12 @@ func (chr *ChatRepository) GetUserConversations(userID uint, page, size int) (*m
 
 	for _, conversation := range conversations {
 		lastMessaege, _ := chr.GetConversationLastMessage(conversation.ID)
-		conversationResponses = append(conversationResponses, conversation.ToConversationResponse(lastMessaege))
+		unread, err := chr.GetConversationUnReadMessagesForUser(conversation.ID, userID)
+		if err != nil {
+			errors = append(errors, err)
+			return nil, errors
+		}
+		conversationResponses = append(conversationResponses, conversation.ToConversationResponse(lastMessaege, unread))
 	}
 
 	return &models.ConversationListResponse{
@@ -256,6 +261,6 @@ func (chr *ChatRepository) GetConversationById(conversationID uint) (*models.Con
 		return nil, errors
 	}
 	lastMessaege, _ := chr.GetConversationLastMessage(conversation.ID)
-	conversationResponse := conversation.ToConversationResponse(lastMessaege)
+	conversationResponse := conversation.ToConversationResponse(lastMessaege, 0)
 	return &conversationResponse, nil
 }

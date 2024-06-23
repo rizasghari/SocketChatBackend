@@ -11,7 +11,7 @@ type Conversation struct {
 	Messages []Message `json:"messages"`
 }
 
-func (conversation *Conversation) ToConversationResponse(lastMessage *Message) ConversationResponse {
+func (conversation *Conversation) ToConversationResponse(lastMessage *Message, unread int) ConversationResponse {
 	members := []*UserResponse{}
 	for _, member := range conversation.Members {
 		members = append(members, member.ToUserResponse())
@@ -21,5 +21,6 @@ func (conversation *Conversation) ToConversationResponse(lastMessage *Message) C
 		Type:        conversation.Type,
 		Members:     members,
 		LastMessage: lastMessage,
+		Unread:      unread,
 	}
 }

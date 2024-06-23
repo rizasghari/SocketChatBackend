@@ -201,7 +201,7 @@ func (chr *ChatRepository) SeenMessage(messageIds []uint, seenerId uint) []error
 func (chr *ChatRepository) GetConversationUnReadMessagesForUser(conversationID, userID uint) (int, error) {
 	var count int = 0
 	result := chr.db.Raw(
-		"SELECT COUNT(*) FROM messages WHERE conversation_id = ? AND sender_id <> ? AND seen_at = NULL",
+		"SELECT COUNT(*) FROM messages WHERE conversation_id = ? AND sender_id <> ? AND seen_at IS NULL",
 		conversationID,
 		userID,
 	).Scan(&count)

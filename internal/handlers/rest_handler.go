@@ -596,5 +596,23 @@ func (rh *RestHandler) GetConversationUnReadMessagesForUser(ctx *gin.Context) {
 		Message: msgs.MsgOperationSuccessful,
 		Data:    count,
 	})
-	
+}
+
+func (rh *RestHandler) GetUsersWhoHaveSentMessage(ctx *gin.Context) {
+	concurrentParam := ctx.Param("concurrent")
+	var concurrent = concurrentParam == "" || concurrentParam == "concurrent"
+	users, err := rh.chatService.GetUsersWhoHaveSentMessage(concurrent)
+	if  err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  []error{err},
+		})
+		return
+	}
+	ctx.JSON(http.StatusOK, models.Response{
+		Success: true,
+		Message: msgs.MsgOperationSuccessful,
+		Data:    users,
+	})
 }

@@ -58,3 +58,11 @@ func (cs *ChatService) SeenMessage(messageIds []uint, seenerId uint) []error {
 func (cs *ChatService) GetConversationUnReadMessagesForUser(conversationID, userID uint) (int, error) {
 	return cs.chatRepo.GetConversationUnReadMessagesForUser(conversationID, userID)
 }
+
+func (cs *ChatService) GetUsersWhoHaveSentMessage(concurrent bool) ([]*models.UserResponse, error) {
+	if concurrent {
+		return cs.chatRepo.GetUsersWhoHaveSentMessageConcurrent()
+	} else {
+		return cs.chatRepo.GetUsersWhoHaveSentMessage()
+	}
+}

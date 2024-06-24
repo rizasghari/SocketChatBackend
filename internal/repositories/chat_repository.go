@@ -1,9 +1,11 @@
 package repositories
 
 import (
+	"log"
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
 	"socketChat/internal/utils"
+	"sync"
 	"time"
 
 	"gorm.io/gorm"
@@ -262,5 +264,50 @@ func (chr *ChatRepository) GetConversationById(conversationID uint) (*models.Con
 	}
 	lastMessaege, _ := chr.GetConversationLastMessage(conversation.ID)
 	conversationResponse := conversation.ToConversationResponse(lastMessaege, 0)
+
 	return &conversationResponse, nil
+}
+
+func (chr *ChatRepository) GetUsersWhoHaveSentMessageConcurrent() ([]*models.UserResponse, error) {
+	var users []models.User
+	wg := sync.WaitGroup{}
+	start := time.Now()
+
+	subQuery := chr.db.Raw("SELECT DISTINCT sender_id FROM messages")
+	if err := chr.db.Raw("SELECT * FROM users WHERE id IN (?)", subQuery).Scan(&users).Error; err != nil {
+		return nil, err
+	}
+
+	var userResponses = make([]*models.UserResponse, len(users))
+	for index, user := range users {
+		wg.Add(1)
+		go func(user models.User, index int, wg *sync.WaitGroup) {
+			defer wg.Done()
+			userResponses[index] = user.ToUserResponse()
+		}(user, index, &wg)
+	}
+	wg.Wait()
+
+	log.Println("GetUsersWhoHaveSentMessageConcurrent - Time spent to run the task:", time.Since(start))
+
+	return userResponses, nil
+}
+
+func (chr *ChatRepository) GetUsersWhoHaveSentMessage() ([]*models.UserResponse, error) {
+	var users []models.User
+	start := time.Now()
+
+	subQuery := chr.db.Raw("SELECT DISTINCT sender_id FROM messages")
+	if err := chr.db.Raw("SELECT * FROM users WHERE id IN (?)", subQuery).Scan(&users).Error; err != nil {
+		return nil, err
+	}
+
+	var userResponses = make([]*models.UserResponse, len(users))
+	for _, user := range users {
+		userResponses = append(userResponses, user.ToUserResponse())
+	}
+	
+	log.Println("GetUsersWhoHaveSentMessage - Time spent to run the task:", time.Since(start))
+	
+	return userResponses, nil
 }

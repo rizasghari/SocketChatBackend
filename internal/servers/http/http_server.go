@@ -102,6 +102,7 @@ func (hs *HttpServer) setupRestfulRoutes() {
 		authenticated.PUT("/users", hs.restHandler.UpdateUser)
 		authenticated.GET("/users/discover", hs.restHandler.DiscoverUsers)
 		authenticated.GET("/profile", hs.restHandler.GetUserProfile)
+		authenticated.GET("/users/sent-message/:concurrent", hs.restHandler.GetUsersWhoHaveSentMessage)
 
 		authenticated.POST("/conversations", hs.restHandler.CreateConversation)
 		authenticated.GET("/conversations/user/:id", hs.restHandler.GetUserConversations)

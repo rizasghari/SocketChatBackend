@@ -600,8 +600,10 @@ func (rh *RestHandler) GetConversationUnReadMessagesForUser(ctx *gin.Context) {
 
 func (rh *RestHandler) GetUsersWhoHaveSentMessage(ctx *gin.Context) {
 	concurrentParam := ctx.Param("concurrent")
-	var concurrent = concurrentParam == "" || concurrentParam == "concurrent"
-	users, err := rh.chatService.GetUsersWhoHaveSentMessage(concurrent)
+	withMutexParam := ctx.Param("mutex")
+	var concurrent = concurrentParam == "concurrent"
+	var withMutex = withMutexParam == "mutex"
+	users, err := rh.chatService.GetUsersWhoHaveSentMessage(concurrent, withMutex)
 	if  err != nil {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
 			Success: false,

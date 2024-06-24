@@ -20,7 +20,7 @@ type User struct {
 
 func (user *User) ToUserResponse() *UserResponse {
 	// for test
-	// time.Sleep(time.Second * 5)
+	// time.Sleep(time.Millisecond * 100)
 
 	return &UserResponse{
 		ID:           user.ID,

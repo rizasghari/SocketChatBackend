@@ -293,8 +293,9 @@ func (chr *ChatRepository) GetUsersWhoHaveSentMessageConcurrent() ([]*models.Use
 	return userResponses, nil
 }
 
-func (chr *ChatRepository) GetUsersWhoHaveSentMessage() ([]*models.UserResponse, error) {
+func (chr *ChatRepository) GetUsersWhoHaveSentMessageConcurrentWithRace() ([]*models.UserResponse, error) {
 	var users []models.User
+	wg := sync.WaitGroup{}
 	start := time.Now()
 
 	subQuery := chr.db.Raw("SELECT DISTINCT sender_id FROM messages")
@@ -304,10 +305,62 @@ func (chr *ChatRepository) GetUsersWhoHaveSentMessage() ([]*models.UserResponse,
 
 	var userResponses = make([]*models.UserResponse, len(users))
 	for _, user := range users {
+		wg.Add(1)
+		go func(user models.User, wg *sync.WaitGroup) {
+			defer wg.Done()
+			userResponses = append(userResponses, user.ToUserResponse())
+		}(user, &wg)
+	}
+	wg.Wait()
+
+	log.Println("GetUsersWhoHaveSentMessageConcurrent - Time spent to run the task:", time.Since(start))
+
+	return userResponses, nil
+}
+
+func (chr *ChatRepository) GetUsersWhoHaveSentMessageConcurrentWithMutex() ([]*models.UserResponse, error) {
+	var users []models.User
+	wg := sync.WaitGroup{}
+	mu := sync.Mutex{}
+	start := time.Now()
+
+	subQuery := chr.db.Raw("SELECT DISTINCT sender_id FROM messages")
+	if err := chr.db.Raw("SELECT * FROM users WHERE id IN (?)", subQuery).Scan(&users).Error; err != nil {
+		return nil, err
+	}
+
+	var userResponses []*models.UserResponse
+	for _, user := range users {
+		wg.Add(1)
+		go func(user models.User, wg *sync.WaitGroup, mu *sync.Mutex) {
+			defer wg.Done()
+			mu.Lock()
+			userResponses = append(userResponses, user.ToUserResponse())
+			mu.Unlock()
+		}(user, &wg, &mu)
+	}
+	wg.Wait()
+
+	log.Println("GetUsersWhoHaveSentMessageConcurrent - Time spent to run the task:", time.Since(start))
+
+	return userResponses, nil
+}
+
+func (chr *ChatRepository) GetUsersWhoHaveSentMessage() ([]*models.UserResponse, error) {
+	var users []models.User
+	start := time.Now()
+
+	subQuery := chr.db.Raw("SELECT DISTINCT sender_id FROM messages")
+	if err := chr.db.Raw("SELECT * FROM users WHERE id IN (?)", subQuery).Scan(&users).Error; err != nil {
+		return nil, err
+	}
+
+	var userResponses []*models.UserResponse
+	for _, user := range users {
 		userResponses = append(userResponses, user.ToUserResponse())
 	}
-	
+
 	log.Println("GetUsersWhoHaveSentMessage - Time spent to run the task:", time.Since(start))
-	
+
 	return userResponses, nil
 }

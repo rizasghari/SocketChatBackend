@@ -1,9 +1,9 @@
 package services
 
 import (
+	"socketChat/internal/errs"
 	"socketChat/internal/models"
 	"socketChat/internal/repositories"
-	"socketChat/internal/errs"
 )
 
 type ChatService struct {
@@ -59,9 +59,13 @@ func (cs *ChatService) GetConversationUnReadMessagesForUser(conversationID, user
 	return cs.chatRepo.GetConversationUnReadMessagesForUser(conversationID, userID)
 }
 
-func (cs *ChatService) GetUsersWhoHaveSentMessage(concurrent bool) ([]*models.UserResponse, error) {
+func (cs *ChatService) GetUsersWhoHaveSentMessage(concurrent, withMutex bool) ([]*models.UserResponse, error) {
 	if concurrent {
-		return cs.chatRepo.GetUsersWhoHaveSentMessageConcurrent()
+		if withMutex {
+			return cs.chatRepo.GetUsersWhoHaveSentMessageConcurrentWithMutex()
+		} else {
+			return cs.chatRepo.GetUsersWhoHaveSentMessageConcurrent()
+		}
 	} else {
 		return cs.chatRepo.GetUsersWhoHaveSentMessage()
 	}

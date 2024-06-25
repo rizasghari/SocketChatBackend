@@ -57,8 +57,8 @@ func migrate() {
 		&models.Conversation{},
 		&models.ConversationMember{},
 		&models.Message{},
-		&whiteboard.Drawn{},
 		&whiteboard.Whiteboard{},
+		&whiteboard.Drawn{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)

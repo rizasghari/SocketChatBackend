@@ -74,6 +74,7 @@ func (chr *ChatRepository) GetUserConversations(userID uint, page, size int) (*m
 		if err := tx.
 			Scopes(utils.Paginate(page, size)).
 			Preload("Members").
+			Preload("Whiteboard").
 			Where("id IN (SELECT conversation_id FROM conversation_members WHERE user_id = ?)", userID).
 			Order("updated_at DESC").
 			Find(&conversations).Error; err != nil {
@@ -253,7 +254,13 @@ func (chr *ChatRepository) FindConversationBetweenTwoUsers(userID1, userID2 uint
 func (chr *ChatRepository) GetConversationById(conversationID uint) (*models.ConversationResponse, []error) {
 	var errors []error
 	var conversation models.Conversation
-	result := chr.db.Preload("Members").Where("id = ?", conversationID).First(&conversation)
+
+	result := chr.db.
+		Preload("Members").
+		Preload("Whiteboard").
+		Where("id = ?", conversationID).
+		First(&conversation)
+
 	if err := result.Error; err != nil {
 		errors = append(errors, err)
 		return nil, errors

@@ -2,7 +2,7 @@ package repositories
 
 import (
 	"socketChat/internal/errs"
-	"socketChat/internal/models/whiteboard"
+	"socketChat/internal/models"
 
 	"gorm.io/gorm"
 )
@@ -17,7 +17,7 @@ func NewWhiteboardRepository(db *gorm.DB) *WhiteboardRepository {
 	}
 }
 
-func (wr *WhiteboardRepository) CreateNewWhiteboard(whiteboard *whiteboard.Whiteboard) error {
+func (wr *WhiteboardRepository) CreateNewWhiteboard(whiteboard *models.Whiteboard) error {
 	result := wr.db.Create(whiteboard)
 	if err := result.Error; err != nil {
 		return err
@@ -27,3 +27,4 @@ func (wr *WhiteboardRepository) CreateNewWhiteboard(whiteboard *whiteboard.White
 	}
 	return nil
 }
+

@@ -12,7 +12,6 @@ import (
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
 	redisModels "socketChat/internal/models/redis"
-	"socketChat/internal/models/whiteboard"
 	"socketChat/internal/msgs"
 	"socketChat/internal/services"
 	"socketChat/internal/utils"
@@ -29,7 +28,7 @@ type SocketWhiteboardHandler struct {
 	mu                sync.Mutex
 	ctx               context.Context
 	upgrader          websocket.Upgrader
-	hub               *whiteboard.SocketWhiteboardHub
+	hub               *models.SocketWhiteboardHub
 	Redis             *redis.Client
 	whiteboardService *services.WhiteboardService
 }
@@ -40,7 +39,7 @@ func NewSocketWhiteboardHandler(redis *redis.Client, ctx context.Context, whiteb
 		whiteboardService: whiteboardService,
 		mu:                sync.Mutex{},
 		Redis:             redis,
-		hub: &whiteboard.SocketWhiteboardHub{
+		hub: &models.SocketWhiteboardHub{
 			Whiteboards: make(map[uint][]*models.SocketClient),
 		},
 	}
@@ -176,7 +175,7 @@ func (swh *SocketWhiteboardHandler) handleWhiteboardAndClinet(userId uint, white
 func (swh *SocketWhiteboardHandler) handleIncommingMessagesWithEvent(ws *websocket.Conn, userInfo *models.Claims, whiteboardId uint) {
 	for {
 		// Read message from client
-		var event whiteboard.WhiteboardSocketEvent
+		var event models.WhiteboardSocketEvent
 		err := ws.ReadJSON(&event)
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
@@ -199,11 +198,11 @@ func (swh *SocketWhiteboardHandler) handleIncommingMessagesWithEvent(ws *websock
 	}
 }
 
-func (swh *SocketWhiteboardHandler) handleUpdateWhiteboardEvent(payload whiteboard.WhiteboardSocketPayload, event string) []error {
+func (swh *SocketWhiteboardHandler) handleUpdateWhiteboardEvent(payload models.WhiteboardSocketPayload, event string) []error {
 	var errors []error
 
 	// Publish the new message to Redis
-	redisEvent := whiteboard.WhiteboardSocketEvent{
+	redisEvent := models.WhiteboardSocketEvent{
 		Event:   event,
 		Payload: payload,
 	}
@@ -251,7 +250,7 @@ func (swh *SocketWhiteboardHandler) logConversations() {
 func (swh *SocketWhiteboardHandler) HandleRedisMessages() {
 	ch := swh.SubscribeToChannel(swh.Redis, redisModels.REDIS_CHANNEL_WHITEBOARD)
 	for msg := range ch {
-		var redisMessage whiteboard.WhiteboardSocketPayload
+		var redisMessage models.WhiteboardSocketPayload
 		if err := json.Unmarshal([]byte(msg.Payload), &redisMessage); err != nil {
 			log.Printf("Error unmarshalling message: %v", err)
 			continue
@@ -260,7 +259,7 @@ func (swh *SocketWhiteboardHandler) HandleRedisMessages() {
 	}
 }
 
-func (swh *SocketWhiteboardHandler) SendMessageToClient(redisMessage whiteboard.WhiteboardSocketPayload) {
+func (swh *SocketWhiteboardHandler) SendMessageToClient(redisMessage models.WhiteboardSocketPayload) {
 	swh.mu.Lock()
 	defer swh.mu.Unlock()
 	if whiteboard, ok := swh.hub.Whiteboards[redisMessage.WhiteboardId]; ok {

@@ -6,9 +6,10 @@ import (
 
 type Conversation struct {
 	gorm.Model
-	Type     string    `gorm:"not null" json:"type"`
-	Members  []User    `gorm:"many2many:conversation_members;"`
-	Messages []Message `json:"messages"`
+	Type       string      `gorm:"not null" json:"type"`
+	Members    []User      `gorm:"many2many:conversation_members;"`
+	Whiteboard *Whiteboard `json:"whiteboard"`
+	Messages   []Message   `json:"messages"`
 }
 
 func (conversation *Conversation) ToConversationResponse(lastMessage *Message, unread int) ConversationResponse {
@@ -22,5 +23,6 @@ func (conversation *Conversation) ToConversationResponse(lastMessage *Message, u
 		Members:     members,
 		LastMessage: lastMessage,
 		Unread:      unread,
+		Whiteboard:  conversation.Whiteboard,
 	}
 }

@@ -1,4 +1,4 @@
-package whiteboard
+package models
 
 type WhiteboardSocketEvent struct {
 	Event   string                  `json:"event"`

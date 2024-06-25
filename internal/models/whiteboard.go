@@ -1,4 +1,4 @@
-package whiteboard
+package models
 
 import "gorm.io/gorm"
 

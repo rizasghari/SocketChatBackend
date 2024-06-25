@@ -8,7 +8,6 @@ import (
 	"socketChat/internal/enums"
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
-	"socketChat/internal/models/whiteboard"
 	"socketChat/internal/msgs"
 	"socketChat/internal/services"
 	"socketChat/internal/utils"
@@ -130,7 +129,7 @@ func (rh *RestHandler) Register(ctx *gin.Context) {
 
 func (rh *RestHandler) CreateWhiteboard(ctx *gin.Context) {
 	var errors []error
-	var createWhiteboardRequest whiteboard.CreateWhiteboardRequest
+	var createWhiteboardRequest models.CreateWhiteboardRequest
 	err := ctx.BindJSON(&createWhiteboardRequest)
 	if err != nil {
 		errors = append(errors, err)
@@ -144,7 +143,7 @@ func (rh *RestHandler) CreateWhiteboard(ctx *gin.Context) {
 
 	creatorID := utils.GetUserIdFromContext(ctx)
 
-	whiteboard := &whiteboard.Whiteboard{
+	whiteboard := &models.Whiteboard{
 		ConversationID: createWhiteboardRequest.ConversationID,
 		Creator: creatorID,
 	}

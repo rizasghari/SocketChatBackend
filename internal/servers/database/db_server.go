@@ -5,7 +5,6 @@ import (
 	"log"
 	"socketChat/configs"
 	"socketChat/internal/models"
-	"socketChat/internal/models/whiteboard"
 	"sync"
 
 	"gorm.io/driver/postgres"
@@ -57,8 +56,8 @@ func migrate() {
 		&models.Conversation{},
 		&models.ConversationMember{},
 		&models.Message{},
-		&whiteboard.Whiteboard{},
-		&whiteboard.Drawn{},
+		&models.Whiteboard{},
+		&models.Drawn{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)

@@ -1,4 +1,4 @@
-package whiteboard
+package models
 
 type WhiteboardSocketPayload struct {
 	Drawn

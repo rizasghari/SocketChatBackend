@@ -1,7 +1,7 @@
 package services
 
 import (
-	"socketChat/internal/models/whiteboard"
+	"socketChat/internal/models"
 	"socketChat/internal/repositories"
 )
 
@@ -15,7 +15,7 @@ func NewWhiteboardService(whiteboardRepo *repositories.WhiteboardRepository) *Wh
 	}
 }
 
-func (ws *WhiteboardService) CreateNewWhiteboard(whiteboard *whiteboard.Whiteboard) error {
+func (ws *WhiteboardService) CreateNewWhiteboard(whiteboard *models.Whiteboard) error {
 	// TODO: validate whiteboard
 	return ws.whiteboardRepo.CreateNewWhiteboard(whiteboard)
 }

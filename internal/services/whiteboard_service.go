@@ -15,7 +15,7 @@ func NewWhiteboardService(whiteboardRepo *repositories.WhiteboardRepository) *Wh
 	}
 }
 
-func (ws *WhiteboardService) CreateNewWhiteboard(whiteboard *whiteboard.Whiteboard) (*whiteboard.Whiteboard, []error) {
+func (ws *WhiteboardService) CreateNewWhiteboard(whiteboard *whiteboard.Whiteboard) error {
 	// TODO: validate whiteboard
 	return ws.whiteboardRepo.CreateNewWhiteboard(whiteboard)
 }

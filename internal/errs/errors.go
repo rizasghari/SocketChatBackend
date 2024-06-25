@@ -28,6 +28,8 @@ const (
 	NoneOfMessagesSeen      = Error("none of messages seen")
 
 	ErrInvalidwhiteboardId = Error("whiteboard not found")
+	ErrWhiteboardCreationFailed = Error("whiteboard creation failed")
+
 
 	ErrObservingSocketOperationRequired = Error("observing socket operation required")
 	ErrInvalidObservingSocketOperation = Error("invalid observing socket operation")

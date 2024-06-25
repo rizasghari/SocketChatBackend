@@ -8,6 +8,7 @@ import (
 	"socketChat/internal/enums"
 	"socketChat/internal/errs"
 	"socketChat/internal/models"
+	"socketChat/internal/models/whiteboard"
 	"socketChat/internal/msgs"
 	"socketChat/internal/services"
 	"socketChat/internal/utils"
@@ -28,13 +29,13 @@ type RestHandler struct {
 func NewRestandler(
 	authService *services.AuthenticationService,
 	chatService *services.ChatService,
-	whiteboardService  *services.WhiteboardService,
+	whiteboardService *services.WhiteboardService,
 	fileManagerService *services.FileManagerService,
 ) *RestHandler {
 	return &RestHandler{
 		authService:        authService,
 		chatService:        chatService,
-		whiteboardService: whiteboardService,
+		whiteboardService:  whiteboardService,
 		fileManagerService: fileManagerService,
 	}
 }
@@ -128,7 +129,42 @@ func (rh *RestHandler) Register(ctx *gin.Context) {
 }
 
 func (rh *RestHandler) CreateWhiteboard(ctx *gin.Context) {
-	
+	var errors []error
+	var createWhiteboardRequest whiteboard.CreateWhiteboardRequest
+	err := ctx.BindJSON(&createWhiteboardRequest)
+	if err != nil {
+		errors = append(errors, err)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errors,
+		})
+		return
+	}
+
+	creatorID := utils.GetUserIdFromContext(ctx)
+
+	whiteboard := &whiteboard.Whiteboard{
+		ConversationID: createWhiteboardRequest.ConversationID,
+		Creator: creatorID,
+	}
+
+	err = rh.whiteboardService.CreateNewWhiteboard(whiteboard)
+	if err != nil {
+		errors = append(errors, err)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errors,
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, models.Response{
+		Success: true,
+		Message: msgs.MsgOperationSuccessful,
+		Data:    whiteboard,
+	})
 }
 
 func (rh *RestHandler) CreateConversation(ctx *gin.Context) {
@@ -472,7 +508,7 @@ func (rh *RestHandler) GetMessagesByConversationID(ctx *gin.Context) {
 }
 
 func (rh *RestHandler) UpdateUser(ctx *gin.Context) {
-	var errors []error 
+	var errors []error
 	var updateUserRequest models.UpdateUserRequest
 	if err := ctx.ShouldBindJSON(&updateUserRequest); err != nil {
 		errors = append(errors, errs.ErrInvalidRequest)
@@ -537,7 +573,7 @@ func (rh *RestHandler) DiscoverUsers(ctx *gin.Context) {
 			Errors:  errs,
 		})
 		return
-	}	
+	}
 
 	ctx.JSON(http.StatusOK, models.Response{
 		Success: true,
@@ -611,7 +647,7 @@ func (rh *RestHandler) GetUsersWhoHaveSentMessage(ctx *gin.Context) {
 	var concurrent = concurrentParam == "concurrent"
 	var withMutex = withMutexParam == "mutex"
 	users, err := rh.chatService.GetUsersWhoHaveSentMessage(concurrent, withMutex)
-	if  err != nil {
+	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
 			Success: false,
 			Message: msgs.MsgOperationFailed,

@@ -2,12 +2,14 @@ package database
 
 import (
 	"fmt"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 	"log"
 	"socketChat/configs"
 	"socketChat/internal/models"
+	"socketChat/internal/models/whiteboard"
 	"sync"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 var (
@@ -50,7 +52,14 @@ func getPSQL(config *configs.Config) *models.PSQL {
 }
 
 func migrate() {
-	err := db.AutoMigrate(&models.User{}, &models.Conversation{}, &models.ConversationMember{}, &models.Message{})
+	err := db.AutoMigrate(
+		&models.User{},
+		&models.Conversation{},
+		&models.ConversationMember{},
+		&models.Message{},
+		&whiteboard.Drawn{},
+		&whiteboard.Whiteboard{},
+	)
 	if err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 		return

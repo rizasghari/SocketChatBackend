@@ -3,14 +3,15 @@ package http
 import (
 	"context"
 	"errors"
-	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
-	"github.com/swaggo/files"
-	"github.com/swaggo/gin-swagger"
 	"log"
 	"net/http"
 	"socketChat/internal/handlers"
 	"sync"
+
+	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 var (
@@ -24,6 +25,7 @@ type HttpServer struct {
 	htmlHandler                *handlers.HtmlHandler
 	socketChatHandler          *handlers.SocketChatHandler
 	socketUserObservingHandler *handlers.SocketUserObservingHandler
+	socketWhiteboardHandler    *handlers.SocketWhiteboardHandler
 	redis                      *redis.Client
 	ctx                        context.Context
 }
@@ -34,6 +36,7 @@ func NewHttpServer(
 	restHandler *handlers.RestHandler,
 	socketChatHandler *handlers.SocketChatHandler,
 	socketUserObservingHandler *handlers.SocketUserObservingHandler,
+	socketWhiteboardHandler *handlers.SocketWhiteboardHandler,
 	htmlHandler *handlers.HtmlHandler,
 ) *HttpServer {
 	once.Do(func() {
@@ -43,6 +46,7 @@ func NewHttpServer(
 			ctx:                        ctx,
 			socketChatHandler:          socketChatHandler,
 			socketUserObservingHandler: socketUserObservingHandler,
+			socketWhiteboardHandler:    socketWhiteboardHandler,
 			htmlHandler:                htmlHandler,
 		}
 	})
@@ -57,6 +61,7 @@ func (hs *HttpServer) Run() {
 	server := hs.startServer()
 	// Wait for interrupt signal to gracefully shut down the server
 	hs.socketChatHandler.WaitForShutdown(server)
+	hs.socketWhiteboardHandler.WaitForShutdown(server)
 }
 
 func (hs *HttpServer) initializeGin() {
@@ -117,7 +122,7 @@ func (hs *HttpServer) setupRestfulRoutes() {
 func (hs *HttpServer) setupWebSocketRoutes() {
 	hs.router.GET("/ws/chat", hs.socketChatHandler.HandleSocketChatRoute)
 	hs.router.GET("/ws/observe", hs.socketUserObservingHandler.HandleSocketUserObservingRoute)
-	hs.router.GET("/ws/whiteboard", nil)
+	hs.router.GET("/ws/whiteboard", hs.socketWhiteboardHandler.HandleSocketWhiteboardRoute)
 }
 
 func (hs *HttpServer) startServer() *http.Server {

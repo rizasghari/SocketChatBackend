@@ -40,6 +40,8 @@ func (app *App) LetsGo() {
 	authService := services.NewAuthenticationService(authRepo, app.configs)
 	chatRepo := repositories.NewChatRepository(db)
 	chatService := services.NewChatService(chatRepo)
+	whiteboardRepo := repositories.NewWhiteboardRepository(db)
+	whiteboardService := services.NewWhiteboardService(whiteboardRepo)
 
 	minioService := services.NewMinioService(app.configs)
 	fileManagerService := services.NewFileManagerService(minioService)
@@ -48,6 +50,7 @@ func (app *App) LetsGo() {
 	socketChatHandler := handlers.NewSocketChatHandler(app.redis, app.ctx, chatService)
 	htmlHandler := handlers.NewHtmlHandler(authService, chatService, fileManagerService)
 	socketObservingHandler := handlers.NewSocketUserObservingHandler(app.redis, app.ctx, authService)
+	socketWhiteboardHandler := handlers.NewSocketWhiteboardHandler(app.redis, app.ctx, whiteboardService)
 
 	http.NewHttpServer(
 		app.ctx,
@@ -55,6 +58,7 @@ func (app *App) LetsGo() {
 		restHandler,
 		socketChatHandler,
 		socketObservingHandler,
+		socketWhiteboardHandler,
 		htmlHandler,
 	).Run()
 }

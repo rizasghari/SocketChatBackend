@@ -21,17 +21,20 @@ import (
 type RestHandler struct {
 	authService        *services.AuthenticationService
 	chatService        *services.ChatService
+	whiteboardService  *services.WhiteboardService
 	fileManagerService *services.FileManagerService
 }
 
 func NewRestandler(
 	authService *services.AuthenticationService,
 	chatService *services.ChatService,
+	whiteboardService  *services.WhiteboardService,
 	fileManagerService *services.FileManagerService,
 ) *RestHandler {
 	return &RestHandler{
 		authService:        authService,
 		chatService:        chatService,
+		whiteboardService: whiteboardService,
 		fileManagerService: fileManagerService,
 	}
 }
@@ -122,6 +125,10 @@ func (rh *RestHandler) Register(ctx *gin.Context) {
 		Success: true,
 		Message: msgs.MsgUserCreatedSuccessfully,
 	})
+}
+
+func (rh *RestHandler) CreateWhiteboard(ctx *gin.Context) {
+	
 }
 
 func (rh *RestHandler) CreateConversation(ctx *gin.Context) {

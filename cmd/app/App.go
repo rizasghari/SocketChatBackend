@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"github.com/redis/go-redis/v9"
 	"socketChat/configs"
 	"socketChat/internal/handlers"
 	"socketChat/internal/repositories"
@@ -10,6 +9,8 @@ import (
 	"socketChat/internal/servers/http"
 	"socketChat/internal/services"
 	"sync"
+
+	"github.com/redis/go-redis/v9"
 )
 
 var (
@@ -46,7 +47,13 @@ func (app *App) LetsGo() {
 	minioService := services.NewMinioService(app.configs)
 	fileManagerService := services.NewFileManagerService(minioService)
 
-	restHandler := handlers.NewRestandler(authService, chatService, fileManagerService)
+	restHandler := handlers.NewRestandler(
+		authService,
+		chatService,
+		whiteboardService,
+		fileManagerService,
+	)
+
 	socketChatHandler := handlers.NewSocketChatHandler(app.redis, app.ctx, chatService)
 	htmlHandler := handlers.NewHtmlHandler(authService, chatService, fileManagerService)
 	socketObservingHandler := handlers.NewSocketUserObservingHandler(app.redis, app.ctx, authService)

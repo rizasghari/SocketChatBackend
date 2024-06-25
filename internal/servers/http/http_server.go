@@ -116,6 +116,8 @@ func (hs *HttpServer) setupRestfulRoutes() {
 
 		authenticated.POST("/messages", hs.restHandler.SaveMessage)
 		authenticated.GET("/messages/conversation/:id", hs.restHandler.GetMessagesByConversationID)
+
+		authenticated.POST("/whiteboards", hs.restHandler.CreateWhiteboard)
 	}
 }
 

@@ -4,7 +4,7 @@
 port = 8080
 
 [jwt]
-expiration_time = 30
+expiration_time = 2280
 
 [database]
 host = "socket-chat-db"

@@ -133,13 +133,11 @@ func (swh *SocketWhiteboardHandler) HandleConnections(ctx *gin.Context, userInfo
 		}
 	}(ws)
 
-	// Handle disconnection
 	swh.handleDiconnectedClient(ws, userInfo.ID, whiteboardId)
 
 	// Add client to hub
 	swh.handleWhiteboardAndClinet(userInfo.ID, whiteboardId, ws)
 
-	// Handle incoming messages
 	swh.handleIncommingMessagesWithEvent(ws, userInfo, whiteboardId)
 }
 

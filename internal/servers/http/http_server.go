@@ -59,7 +59,7 @@ func (hs *HttpServer) Run() {
 	hs.setupRestfulRoutes()
 	hs.socketChatHandler.StartSocket()
 	server := hs.startServer()
-	// Wait for interrupt signal to gracefully shut down the server
+	
 	hs.socketChatHandler.WaitForShutdown(server)
 	hs.socketWhiteboardHandler.WaitForShutdown(server)
 }

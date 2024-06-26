@@ -43,7 +43,7 @@ func NewSocketWhiteboardHandler(redis *redis.Client, ctx context.Context, whiteb
 			Whiteboards: make(map[uint][]*models.SocketClient),
 		},
 	}
-	go swh.HandleRedisMessages()
+	go swh.handleRedisMessages()
 	return swh
 }
 
@@ -69,6 +69,7 @@ func (swh *SocketWhiteboardHandler) HandleSocketWhiteboardRoute(ctx *gin.Context
 		})
 		return
 	}
+	log.Printf("HandleSocketWhiteboardRoute / whiteboardId: %v", whiteboardId)
 
 	// Todo: Check if whiteboard exists
 
@@ -91,7 +92,7 @@ func (swh *SocketWhiteboardHandler) authorize(ctx *gin.Context) (*models.Claims,
 }
 
 func (swh *SocketWhiteboardHandler) getWhiteboardIdFromQuery(ctx *gin.Context) (uint, error) {
-	whiteboardIdStr := ctx.Query("whiteboardId")
+	whiteboardIdStr := ctx.Query("id")
 	if whiteboardIdStr == "" {
 		return 0, errs.ErrInvalidwhiteboardId
 	}
@@ -138,7 +139,7 @@ func (swh *SocketWhiteboardHandler) HandleConnections(ctx *gin.Context, userInfo
 	// Add client to hub
 	swh.handleWhiteboardAndClinet(userInfo.ID, whiteboardId, ws)
 
-	swh.handleIncommingMessagesWithEvent(ws, userInfo, whiteboardId)
+	swh.handleIncommingWhiteboardEvent(ws, userInfo, whiteboardId)
 }
 
 func (swh *SocketWhiteboardHandler) handleDiconnectedClient(ws *websocket.Conn, userId uint, whiteboardId uint) {
@@ -149,13 +150,15 @@ func (swh *SocketWhiteboardHandler) handleDiconnectedClient(ws *websocket.Conn, 
 }
 
 func (swh *SocketWhiteboardHandler) handleWhiteboardAndClinet(userId uint, whiteboardId uint, ws *websocket.Conn) {
+	log.Printf("handleWhiteboardAndClinet / user: %v - whiteboard: %v", userId, whiteboardId)
 	swh.mu.Lock()
 	// Add conversation to hub if not exists
-	if _, ok := swh.hub.Whiteboards[whiteboardId]; !ok {
+	if _, exists := swh.hub.Whiteboards[whiteboardId]; !exists {
 		swh.hub.Whiteboards[whiteboardId] = []*models.SocketClient{}
 	}
 	// Add client to conversation if not exists
-	if isMember := slices.Contains(swh.hub.Whiteboards[whiteboardId], &models.SocketClient{Conn: ws}); !isMember {
+	if isMember := slices.Contains(swh.hub.Whiteboards[whiteboardId], &models.SocketClient{Conn: ws, UserId: userId}); !isMember {
+		log.Printf("user %v is not observing %v whiteboard. Adding it.", userId, whiteboardId)
 		swh.hub.Whiteboards[whiteboardId] =
 			append(swh.hub.Whiteboards[whiteboardId],
 				&models.SocketClient{
@@ -167,10 +170,10 @@ func (swh *SocketWhiteboardHandler) handleWhiteboardAndClinet(userId uint, white
 	swh.mu.Unlock()
 
 	// Log conversations for debug purposes
-	swh.logConversations()
+	swh.logWhiteboard()
 }
 
-func (swh *SocketWhiteboardHandler) handleIncommingMessagesWithEvent(ws *websocket.Conn, userInfo *models.Claims, whiteboardId uint) {
+func (swh *SocketWhiteboardHandler) handleIncommingWhiteboardEvent(ws *websocket.Conn, userInfo *models.Claims, whiteboardId uint) {
 	for {
 		// Read message from client
 		var event models.WhiteboardSocketEvent
@@ -182,6 +185,8 @@ func (swh *SocketWhiteboardHandler) handleIncommingMessagesWithEvent(ws *websock
 			}
 			log.Printf("handleIncommingMessagesWithEvent / Error reading json: %v", err)
 		}
+
+		log.Printf("handleIncommingWhiteboardEvent / Event: %+v", event)
 
 		// Handle event
 		switch event.Event {
@@ -211,7 +216,7 @@ func (swh *SocketWhiteboardHandler) handleUpdateWhiteboardEvent(payload models.W
 		return errors
 	}
 	log.Println("jsonEvent: ", string(jsonEvent))
-	if err := swh.PublishMessage(swh.Redis, redisModels.REDIS_CHANNEL_WHITEBOARD, jsonEvent); err != nil {
+	if err := swh.publish(swh.Redis, redisModels.REDIS_CHANNEL_WHITEBOARD, jsonEvent); err != nil {
 		errors = append(errors, err)
 		return errors
 	}
@@ -233,48 +238,55 @@ func (swh *SocketWhiteboardHandler) deleteDiconnectedClientFromWhiteboard(userId
 		delete(swh.hub.Whiteboards, whiteboardId)
 	}
 	// Log conversations for debug purposes
-	swh.logConversations()
+	swh.logWhiteboard()
 }
 
-func (swh *SocketWhiteboardHandler) logConversations() {
+func (swh *SocketWhiteboardHandler) logWhiteboard() {
 	for whiteboardId, clients := range swh.hub.Whiteboards {
-		log.Printf("Conversation ID: %v", whiteboardId)
+		log.Printf("whiteboard ID: %v", whiteboardId)
 		for _, client := range clients {
 			log.Printf("Client ID: %v", client.UserId)
 		}
 	}
 }
 
-func (swh *SocketWhiteboardHandler) HandleRedisMessages() {
+func (swh *SocketWhiteboardHandler) handleRedisMessages() {
+	log.Printf("HandleRedisMessages")
 	ch := swh.SubscribeToChannel(swh.Redis, redisModels.REDIS_CHANNEL_WHITEBOARD)
 	for msg := range ch {
-		var redisMessage models.WhiteboardSocketPayload
+		log.Printf("HandleRedisMessages New message")
+		var redisMessage models.WhiteboardSocketEvent
 		if err := json.Unmarshal([]byte(msg.Payload), &redisMessage); err != nil {
 			log.Printf("Error unmarshalling message: %v", err)
 			continue
 		}
-		swh.SendMessageToClient(redisMessage)
+		swh.send(redisMessage)
 	}
 }
 
-func (swh *SocketWhiteboardHandler) SendMessageToClient(redisMessage models.WhiteboardSocketPayload) {
+func (swh *SocketWhiteboardHandler) send(redisMessage models.WhiteboardSocketEvent) {
+	log.Printf("send")
 	swh.mu.Lock()
 	defer swh.mu.Unlock()
-	if whiteboard, ok := swh.hub.Whiteboards[redisMessage.WhiteboardId]; ok {
+	if whiteboard, ok := swh.hub.Whiteboards[redisMessage.Payload.WhiteboardId]; ok {
+		log.Printf("send / whiteboard found, id: %v", redisMessage.Payload.WhiteboardId)
 		for _, client := range whiteboard {
+			log.Printf("send / client: %v", client.UserId)
 			if err := client.Conn.WriteJSON(redisMessage); err != nil {
 				log.Printf("Error writing json: %v", err)
 				err := client.Conn.Close()
 				if err != nil {
 					return
 				}
-				swh.deleteDiconnectedClientFromWhiteboard(client.UserId, redisMessage.WhiteboardId)
+				swh.deleteDiconnectedClientFromWhiteboard(client.UserId, redisMessage.Payload.WhiteboardId)
 			}
 		}
+	} else {
+		log.Printf("send / whiteboard NOT found, id: %v", redisMessage.Payload.WhiteboardId)
 	}
 }
 
-func (swh *SocketWhiteboardHandler) PublishMessage(redis *redis.Client, channel string, message []byte) error {
+func (swh *SocketWhiteboardHandler) publish(redis *redis.Client, channel string, message []byte) error {
 	return redis.Publish(swh.ctx, channel, message).Err()
 }
 

@@ -73,8 +73,8 @@ func (chr *ChatRepository) GetUserConversations(userID uint, page, size int) (*m
 	transactionErr := chr.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.
 			Scopes(utils.Paginate(page, size)).
-			Preload("Members").
-			Preload("Whiteboard").
+			Preload("Members"). // The name of filed in conversation struct
+			Preload("Whiteboard"). // The name of filed in conversation struct
 			Where("id IN (SELECT conversation_id FROM conversation_members WHERE user_id = ?)", userID).
 			Order("updated_at DESC").
 			Find(&conversations).Error; err != nil {

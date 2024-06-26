@@ -17,14 +17,25 @@ func NewWhiteboardRepository(db *gorm.DB) *WhiteboardRepository {
 	}
 }
 
-func (wr *WhiteboardRepository) CreateNewWhiteboard(whiteboard *models.Whiteboard) error {
+func (wr *WhiteboardRepository) CreateNewWhiteboard(whiteboard *models.Whiteboard) (*models.Whiteboard, error) {
 	result := wr.db.Create(whiteboard)
 	if err := result.Error; err != nil {
-		return err
+		return nil, err
 	}
 	if result.RowsAffected <= 0 {
-		return errs.ErrWhiteboardCreationFailed
+		return nil, errs.ErrWhiteboardCreationFailed
 	}
-	return nil
+	return whiteboard, nil
 }
 
+func (wr *WhiteboardRepository) FindConversationWhiteboard(conversationID uint) (*models.Whiteboard, error) {
+	var whiteboard models.Whiteboard
+	result := wr.db.Where("conversation_id = ?", conversationID).Last(&whiteboard)
+	if err := result.Error; err != nil {
+		return nil, err
+	}
+	if result.RowsAffected == 0 {
+		return nil, errs.ErrNoWhiteboardFoundForThisConversation
+	}
+	return &whiteboard, nil
+}

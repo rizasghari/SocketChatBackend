@@ -29,6 +29,7 @@ const (
 
 	ErrInvalidwhiteboardId = Error("whiteboard not found")
 	ErrWhiteboardCreationFailed = Error("whiteboard creation failed")
+	ErrNoWhiteboardFoundForThisConversation = Error("no whiteboard found for this conversation")
 
 
 	ErrObservingSocketOperationRequired = Error("observing socket operation required")

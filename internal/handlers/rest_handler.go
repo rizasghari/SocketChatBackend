@@ -148,10 +148,22 @@ func (rh *RestHandler) CreateWhiteboard(ctx *gin.Context) {
 		Creator: creatorID,
 	}
 
-	err = rh.whiteboardService.CreateNewWhiteboard(whiteboard)
+	// Check if the creator is member of the conversation
+	isMember := rh.chatService.CheckUserInConversation(creatorID, createWhiteboardRequest.ConversationID)
+	if (!isMember) {
+		errors = append(errors, errs.ErrInvalidConversationId)
+		ctx.AbortWithStatusJSON(http.StatusForbidden, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errors,
+		})
+		return
+	}
+
+	whiteboard, err = rh.whiteboardService.CreateNewWhiteboard(whiteboard)
 	if err != nil {
 		errors = append(errors, err)
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+		ctx.AbortWithStatusJSON(http.StatusNotFound, models.Response{
 			Success: false,
 			Message: msgs.MsgOperationFailed,
 			Errors:  errors,

@@ -179,11 +179,17 @@ func (swh *SocketWhiteboardHandler) handleIncommingWhiteboardEvent(ws *websocket
 		var event models.WhiteboardSocketEvent
 		err := ws.ReadJSON(&event)
 		if err != nil {
-			if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
+			if websocket.IsCloseError(err,
+				websocket.CloseAbnormalClosure,
+				websocket.CloseNormalClosure,
+				websocket.CloseNoStatusReceived,
+			) {
+				log.Printf("SocketWhiteboardHandler / handleIncommingWhiteboardEvent / connection closed by client side - Error: %v", err)
 				swh.deleteDiconnectedClientFromWhiteboard(userInfo.ID, whiteboardId)
 				break
 			}
 			log.Printf("handleIncommingMessagesWithEvent / Error reading json: %v", err)
+			continue
 		}
 
 		log.Printf("handleIncommingWhiteboardEvent / Event: %+v", event)

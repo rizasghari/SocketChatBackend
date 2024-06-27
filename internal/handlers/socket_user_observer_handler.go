@@ -112,7 +112,12 @@ func (suoh *SocketUserObservingHandler) keepSocketAlive(ws *websocket.Conn, user
 		var buf bytes.Buffer
 		err := ws.ReadJSON(&buf)
 		if err != nil {
-			if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
+			if websocket.IsCloseError(err,
+				websocket.CloseAbnormalClosure,
+				websocket.CloseNormalClosure,
+				websocket.CloseNoStatusReceived,
+			) {
+				log.Printf("SocketUserObservingHandler / keepSocketAlive / connection closed by client side - Error: %v", err)
 				suoh.unsubscribe(userId)
 				break
 			}

@@ -190,11 +190,17 @@ func (sch *SocketChatHandler) handleIncommingMessagesWithEvent(ws *websocket.Con
 		var event socketModels.SocketEvent
 		err := ws.ReadJSON(&event)
 		if err != nil {
-			if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
+			if websocket.IsCloseError(err,
+				websocket.CloseAbnormalClosure,
+				websocket.CloseNormalClosure,
+				websocket.CloseNoStatusReceived,
+			) {
+				log.Printf("SocketChatHandler / handleIncommingMessagesWithEvent / connection closed by client side - Error: %v", err)
 				sch.deleteDiconnectedClientFromConversation(userInfo.ID, conversationId)
 				break
 			}
 			log.Printf("Error reading json: %v", err)
+			continue
 		}
 
 		// Set event conversation id

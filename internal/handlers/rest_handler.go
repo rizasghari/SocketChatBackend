@@ -171,10 +171,63 @@ func (rh *RestHandler) CreateWhiteboard(ctx *gin.Context) {
 		return
 	}
 
+	
+
 	ctx.JSON(http.StatusOK, models.Response{
 		Success: true,
 		Message: msgs.MsgOperationSuccessful,
 		Data:    whiteboard,
+	})
+}
+
+func (rh *RestHandler) CreateWhiteboardDrawn(ctx *gin.Context) {
+	var errors []error
+	var createDrawnRequest models.CreateDrawnRequest
+	err := ctx.BindJSON(&createDrawnRequest)
+	if err != nil {
+		errors = append(errors, err)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errors,
+		})
+		return
+	}
+
+	drawer := utils.GetUserIdFromContext(ctx)
+
+	drawn := &models.Drawn{
+		WhiteboardId: createDrawnRequest.WhiteboardId,
+		Drawer: drawer,
+	}
+
+	// Check if the creator is member of the conversation
+	isMember := rh.chatService.CheckUserInConversation(drawer, createDrawnRequest.ConversationID)
+	if (!isMember) {
+		errors = append(errors, errs.ErrInvalidConversationId)
+		ctx.AbortWithStatusJSON(http.StatusForbidden, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errors,
+		})
+		return
+	}
+
+	drawn, err = rh.whiteboardService.CreareNewDrawn(drawn)
+	if err != nil {
+		errors = append(errors, err)
+		ctx.AbortWithStatusJSON(http.StatusNotFound, models.Response{
+			Success: false,
+			Message: msgs.MsgOperationFailed,
+			Errors:  errors,
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, models.Response{
+		Success: true,
+		Message: msgs.MsgOperationSuccessful,
+		Data:    drawn,
 	})
 }
 

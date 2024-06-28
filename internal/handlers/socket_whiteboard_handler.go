@@ -59,8 +59,8 @@ func (swh *SocketWhiteboardHandler) HandleSocketWhiteboardRoute(ctx *gin.Context
 		return
 	}
 
-	// Get conversation ID and validate if it exists
-	whiteboardId, err := swh.getWhiteboardIdFromQuery(ctx)
+	// Retrive conversation ID and validate if it exists
+	whiteboardId, err := swh.retriveWhiteboardIdFromQuery(ctx)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.Response{
 			Success: false,
@@ -75,7 +75,7 @@ func (swh *SocketWhiteboardHandler) HandleSocketWhiteboardRoute(ctx *gin.Context
 
 	// Todo: check if user is whiteboard member
 
-	swh.HandleConnections(ctx, userInfo, whiteboardId)
+	swh.handleConnection(ctx, userInfo, whiteboardId)
 }
 
 func (swh *SocketWhiteboardHandler) authorize(ctx *gin.Context) (*models.Claims, error) {
@@ -91,7 +91,7 @@ func (swh *SocketWhiteboardHandler) authorize(ctx *gin.Context) (*models.Claims,
 	return userInfo, nil
 }
 
-func (swh *SocketWhiteboardHandler) getWhiteboardIdFromQuery(ctx *gin.Context) (uint, error) {
+func (swh *SocketWhiteboardHandler) retriveWhiteboardIdFromQuery(ctx *gin.Context) (uint, error) {
 	whiteboardIdStr := ctx.Query("id")
 	if whiteboardIdStr == "" {
 		return 0, errs.ErrInvalidwhiteboardId
@@ -116,7 +116,7 @@ func (swh *SocketWhiteboardHandler) upgradeHttpToWs(ctx *gin.Context) (*websocke
 	return ws, nil
 }
 
-func (swh *SocketWhiteboardHandler) HandleConnections(ctx *gin.Context, userInfo *models.Claims, whiteboardId uint) {
+func (swh *SocketWhiteboardHandler) handleConnection(ctx *gin.Context, userInfo *models.Claims, whiteboardId uint) {
 	// Upgrade HTTP connection to WebSocket
 	ws, err := swh.upgradeHttpToWs(ctx)
 	if err != nil {
@@ -158,7 +158,7 @@ func (swh *SocketWhiteboardHandler) handleWhiteboardAndClinet(userId uint, white
 	}
 	// Add client to conversation if not exists
 	if isMember := slices.Contains(swh.hub.Whiteboards[whiteboardId], &models.SocketClient{Conn: ws, UserId: userId}); !isMember {
-		log.Printf("user %v is not observing %v whiteboard. Adding it.", userId, whiteboardId)
+		log.Printf("Adding user %v to %v whiteboard observers.", userId, whiteboardId)
 		swh.hub.Whiteboards[whiteboardId] =
 			append(swh.hub.Whiteboards[whiteboardId],
 				&models.SocketClient{
@@ -168,14 +168,11 @@ func (swh *SocketWhiteboardHandler) handleWhiteboardAndClinet(userId uint, white
 			)
 	}
 	swh.mu.Unlock()
-
-	// Log conversations for debug purposes
-	swh.logWhiteboard()
+	swh.logHub()
 }
 
 func (swh *SocketWhiteboardHandler) handleIncommingWhiteboardEvent(ws *websocket.Conn, userInfo *models.Claims, whiteboardId uint) {
 	for {
-		// Read message from client
 		var event models.WhiteboardSocketEvent
 		err := ws.ReadJSON(&event)
 		if err != nil {
@@ -199,7 +196,7 @@ func (swh *SocketWhiteboardHandler) handleIncommingWhiteboardEvent(ws *websocket
 		case enums.SOCKET_EVENT_UPDATE_WHITEBOARD:
 			errs := swh.handleUpdateWhiteboardEvent(event.Payload, enums.SOCKET_EVENT_UPDATE_WHITEBOARD)
 			if len(errs) > 0 {
-				log.Printf("handleIncommingMessagesWithEvent - Error while handling SOCKET_EVENT_UPDATE_WHITEBOARD event: %v", errs)
+				log.Printf("handleIncommingWhiteboardEvent - Error while handling SOCKET_EVENT_UPDATE_WHITEBOARD event: %v", errs)
 			}
 		default:
 			log.Printf("Unknown event: %v", event)
@@ -210,7 +207,6 @@ func (swh *SocketWhiteboardHandler) handleIncommingWhiteboardEvent(ws *websocket
 func (swh *SocketWhiteboardHandler) handleUpdateWhiteboardEvent(payload models.WhiteboardSocketPayload, event string) []error {
 	var errors []error
 
-	// Publish the new message to Redis
 	redisEvent := models.WhiteboardSocketEvent{
 		Event:   event,
 		Payload: payload,
@@ -221,7 +217,7 @@ func (swh *SocketWhiteboardHandler) handleUpdateWhiteboardEvent(payload models.W
 		errors = append(errors, err)
 		return errors
 	}
-	log.Println("jsonEvent: ", string(jsonEvent))
+	log.Println("handleUpdateWhiteboardEvent / jsonEvent: ", string(jsonEvent))
 	if err := swh.publish(swh.Redis, redisModels.REDIS_CHANNEL_WHITEBOARD, jsonEvent); err != nil {
 		errors = append(errors, err)
 		return errors
@@ -244,10 +240,10 @@ func (swh *SocketWhiteboardHandler) deleteDiconnectedClientFromWhiteboard(userId
 		delete(swh.hub.Whiteboards, whiteboardId)
 	}
 	// Log conversations for debug purposes
-	swh.logWhiteboard()
+	swh.logHub()
 }
 
-func (swh *SocketWhiteboardHandler) logWhiteboard() {
+func (swh *SocketWhiteboardHandler) logHub() {
 	for whiteboardId, clients := range swh.hub.Whiteboards {
 		log.Printf("whiteboard ID: %v", whiteboardId)
 		for _, client := range clients {
@@ -256,6 +252,7 @@ func (swh *SocketWhiteboardHandler) logWhiteboard() {
 	}
 }
 
+// This function will run in a goroutine to listen to redis pubsub channel
 func (swh *SocketWhiteboardHandler) handleRedisMessages() {
 	log.Printf("HandleRedisMessages")
 	ch := swh.SubscribeToChannel(swh.Redis, redisModels.REDIS_CHANNEL_WHITEBOARD)
@@ -271,7 +268,7 @@ func (swh *SocketWhiteboardHandler) handleRedisMessages() {
 }
 
 func (swh *SocketWhiteboardHandler) send(redisMessage models.WhiteboardSocketEvent) {
-	log.Printf("send")
+	log.Printf("Sending whiteboard event to clients")
 	swh.mu.Lock()
 	defer swh.mu.Unlock()
 	if whiteboard, ok := swh.hub.Whiteboards[redisMessage.Payload.WhiteboardId]; ok {

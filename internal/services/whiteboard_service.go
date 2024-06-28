@@ -20,8 +20,17 @@ func (ws *WhiteboardService) CreateNewWhiteboard(whiteboard *models.Whiteboard) 
 	// Check if a whiteboard already has been created before for the conversation
 	found, err := ws.whiteboardRepo.FindConversationWhiteboard(whiteboard.ConversationID)
 	if (err != nil) {
-		log.Printf("CreateNewWhiteboard / FindConversationWhiteboard / error: %v", err)
 		return ws.whiteboardRepo.CreateNewWhiteboard(whiteboard)
+	}
+	return found, nil
+}
+
+func (ws *WhiteboardService) CreareNewDrawn(drawn *models.Drawn) (*models.Drawn, error) {
+	// Check if a drawn already has been created before for the whiteboard and user
+	found, err := ws.whiteboardRepo.FindWhiteboardDrawn(drawn.WhiteboardId, drawn.Drawer)
+	if (err != nil) {
+		log.Printf("CreareNewDrawn / FindWhiteboardDrawn / error: %v", err)
+		return ws.whiteboardRepo.CreateNewDrawn(drawn)
 	}
 	return found, nil
 }

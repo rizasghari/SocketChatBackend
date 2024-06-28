@@ -38,7 +38,7 @@ func (wr *WhiteboardRepository) CreateNewWhiteboard(whiteboard *models.Whiteboar
 		for _, member := range members {
 			drawn := models.Drawn{
 				Drawer: member.UserID,
-				WhiteboardId: whiteboard.ID,
+				WhiteboardID: whiteboard.ID,
 			}
 			if err := tx.Create(&drawn).Error; err != nil {
 				return err

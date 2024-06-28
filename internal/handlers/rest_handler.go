@@ -197,7 +197,7 @@ func (rh *RestHandler) CreateWhiteboardDrawn(ctx *gin.Context) {
 	drawer := utils.GetUserIdFromContext(ctx)
 
 	drawn := &models.Drawn{
-		WhiteboardId: createDrawnRequest.WhiteboardId,
+		WhiteboardID: createDrawnRequest.WhiteboardId,
 		Drawer: drawer,
 	}
 

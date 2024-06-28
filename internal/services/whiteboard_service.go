@@ -27,7 +27,7 @@ func (ws *WhiteboardService) CreateNewWhiteboard(whiteboard *models.Whiteboard) 
 
 func (ws *WhiteboardService) CreareNewDrawn(drawn *models.Drawn) (*models.Drawn, error) {
 	// Check if a drawn already has been created before for the whiteboard and user
-	found, err := ws.whiteboardRepo.FindWhiteboardDrawn(drawn.WhiteboardId, drawn.Drawer)
+	found, err := ws.whiteboardRepo.FindWhiteboardDrawn(drawn.WhiteboardID, drawn.Drawer)
 	if (err != nil) {
 		log.Printf("CreareNewDrawn / FindWhiteboardDrawn / error: %v", err)
 		return ws.whiteboardRepo.CreateNewDrawn(drawn)

@@ -34,10 +34,10 @@ func (wr *WhiteboardRepository) CreateNewWhiteboard(whiteboard *models.Whiteboar
 			Find(&members).Error; err != nil {
 			return err
 		}
-		
+
 		for _, member := range members {
 			drawn := models.Drawn{
-				Drawer: member.UserID,
+				Drawer:       member.UserID,
 				WhiteboardID: whiteboard.ID,
 			}
 			if err := tx.Create(&drawn).Error; err != nil {
@@ -52,13 +52,16 @@ func (wr *WhiteboardRepository) CreateNewWhiteboard(whiteboard *models.Whiteboar
 	if txErr != nil {
 		return nil, txErr
 	}
-	
+
 	return whiteboard, nil
 }
 
 func (wr *WhiteboardRepository) FindConversationWhiteboard(conversationID uint) (*models.Whiteboard, error) {
 	var whiteboard models.Whiteboard
-	result := wr.db.Where("conversation_id = ?", conversationID).Last(&whiteboard)
+	result := wr.db.
+		Preload("Drawns").
+		Where("conversation_id = ?", conversationID).
+		Last(&whiteboard)
 	if err := result.Error; err != nil {
 		return nil, err
 	}

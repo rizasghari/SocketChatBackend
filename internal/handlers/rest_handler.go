@@ -171,8 +171,6 @@ func (rh *RestHandler) CreateWhiteboard(ctx *gin.Context) {
 		return
 	}
 
-	
-
 	ctx.JSON(http.StatusOK, models.Response{
 		Success: true,
 		Message: msgs.MsgOperationSuccessful,

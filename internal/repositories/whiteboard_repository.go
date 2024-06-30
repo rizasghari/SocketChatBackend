@@ -93,3 +93,22 @@ func (wr *WhiteboardRepository) FindWhiteboardDrawn(whiteboardID, drawer uint) (
 	}
 	return &drawn, nil
 }
+
+func (wr *WhiteboardRepository) CreateSubDrawn(subDrownPayload *models.WhiteboardSocketPayload) (*models.SubDrawn, error) {
+
+	subDrawn := models.SubDrawn{
+		DrawnID: subDrownPayload.DrawnID,
+		Points: subDrownPayload.Points,
+		Paint: subDrownPayload.Paint,
+	}
+
+	result := wr.db.Save(&subDrawn)
+
+	if err := result.Error; err != nil {
+		return nil, err
+	}
+	if result.RowsAffected <= 0 {
+		return nil, errs.ErrWhiteboardCreationFailed
+	}
+	return &subDrawn, nil
+}

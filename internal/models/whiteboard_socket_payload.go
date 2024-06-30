@@ -1,8 +1,9 @@
 package models
 
 type WhiteboardSocketPayload struct {
-	ID           uint    `json:"id"`
-	Drawer       uint    `json:"drawer_user_id"`
-	Points       *Points `json:"points"`
-	WhiteboardId uint    `json:"whiteboard_id"`
+	DrawnID      uint   `json:"drawn_id"`
+	Drawer       uint   `json:"drawer_user_id"`
+	Points       Points `json:"points"`
+	Paint        Paint  `json:"paint"`
+	WhiteboardId uint   `json:"whiteboard_id"`
 }

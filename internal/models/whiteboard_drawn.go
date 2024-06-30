@@ -6,7 +6,7 @@ import (
 
 type Drawn struct {
 	gorm.Model
-	Drawer       uint    `json:"drawer_user_id" gorm:"column:user_id"`
-	Points       *Points `json:"points" gorm:"type:jsonb"`
-	WhiteboardID uint    `json:"whiteboard_id"`
+	Drawer       uint         `json:"drawer_user_id" gorm:"column:user_id"`
+	SubDrawns    *[]SubDrawn `json:"sub_drawns"`
+	WhiteboardID uint         `json:"whiteboard_id"`
 }

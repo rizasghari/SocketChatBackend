@@ -73,8 +73,7 @@ func (chr *ChatRepository) GetUserConversations(userID uint, page, size int) (*m
 	transactionErr := chr.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.
 			Scopes(utils.Paginate(page, size)).
-			// Preload("Whiteboard").
-			Preload("Whiteboard.Drawns").
+			Preload("Whiteboard.Drawns.SubDrawns").
 			Preload("Members"). 
 			Where("id IN (SELECT conversation_id FROM conversation_members WHERE user_id = ?)", userID).
 			Order("updated_at DESC").

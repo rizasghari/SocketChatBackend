@@ -70,11 +70,8 @@ func (swh *SocketWhiteboardHandler) HandleSocketWhiteboardRoute(ctx *gin.Context
 		return
 	}
 	log.Printf("HandleSocketWhiteboardRoute / whiteboardId: %v", whiteboardId)
-
 	// Todo: Check if whiteboard exists
-
 	// Todo: check if user is whiteboard member
-
 	swh.handleConnection(ctx, userInfo, whiteboardId)
 }
 
@@ -194,7 +191,7 @@ func (swh *SocketWhiteboardHandler) handleIncommingWhiteboardEvent(ws *websocket
 		// Handle event
 		switch event.Event {
 		case enums.SOCKET_EVENT_UPDATE_WHITEBOARD:
-			errs := swh.handleUpdateWhiteboardEvent(event.Payload, enums.SOCKET_EVENT_UPDATE_WHITEBOARD)
+			errs := swh.handleUpdateWhiteboardEvent(event)
 			if len(errs) > 0 {
 				log.Printf("handleIncommingWhiteboardEvent - Error while handling SOCKET_EVENT_UPDATE_WHITEBOARD event: %v", errs)
 			}
@@ -204,12 +201,14 @@ func (swh *SocketWhiteboardHandler) handleIncommingWhiteboardEvent(ws *websocket
 	}
 }
 
-func (swh *SocketWhiteboardHandler) handleUpdateWhiteboardEvent(payload models.WhiteboardSocketPayload, event string) []error {
+func (swh *SocketWhiteboardHandler) handleUpdateWhiteboardEvent(event models.WhiteboardSocketEvent) []error {
 	var errors []error
 
+	
+
 	redisEvent := models.WhiteboardSocketEvent{
-		Event:   event,
-		Payload: payload,
+		Event:   event.Event,
+		Payload: event.Payload,
 	}
 
 	jsonEvent, err := json.Marshal(redisEvent)
@@ -254,10 +253,8 @@ func (swh *SocketWhiteboardHandler) logHub() {
 
 // This function will run in a goroutine to listen to redis pubsub channel
 func (swh *SocketWhiteboardHandler) handleRedisMessages() {
-	log.Printf("HandleRedisMessages")
 	ch := swh.SubscribeToChannel(swh.Redis, redisModels.REDIS_CHANNEL_WHITEBOARD)
 	for msg := range ch {
-		log.Printf("HandleRedisMessages New message")
 		var redisMessage models.WhiteboardSocketEvent
 		if err := json.Unmarshal([]byte(msg.Payload), &redisMessage); err != nil {
 			log.Printf("Error unmarshalling message: %v", err)
